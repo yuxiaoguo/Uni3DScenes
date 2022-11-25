@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 from PIL import Image as pil_image 
 
-from graphics_utils import g_io, g_math
+from graphics_utils import g_io, g_math, g_perf
 
 from .s3d_utils import S3DUtilize
 from ..utils.base import DatasetBase, ProcessUnit
@@ -143,6 +143,9 @@ class Structured3DDataGen(DatasetBase):
     @staticmethod
     def _points2voxel(attr_points: List[np.ndarray], res=0.005):
         p_points, p_colors, p_labels = attr_points
+
+        if not p_points.shape:
+            return list(), list(), list()
         
         vd_points = np.floor(p_points / res).astype(np.int64)
         vd_max = np.max(vd_points, axis=0)
@@ -154,7 +157,9 @@ class Structured3DDataGen(DatasetBase):
 
         return p_points[vd_uni], p_colors[vd_uni], p_labels[vd_uni]
 
-    def _mp_view2pointcloud(self, rooms_list: List[str], proc_unit: ProcessUnit):
+    def _mp_view2pointcloud(self, rooms_list: List[str], proc_unit: ProcessUnit,\
+        start_index=0, worker_id=0):
+        del start_index, worker_id
         zip_reader = self._load_zips()
 
         dump_folder = os.path.join(self.root_dir, 'point_cloud')
@@ -163,6 +168,9 @@ class Structured3DDataGen(DatasetBase):
         for r_idx, room_path in enumerate(rooms_list):
             scene_id, _, room_id = room_path.split('/')
             dump_name = f'{scene_id}_{room_id}'
+            dump_path = os.path.join(dump_folder, f'{dump_name}_v001_points.npz')
+            if os.path.exists(dump_path):
+                continue
 
             prsp_root = f'{room_path}{__class__.PERSPECTIVE_PREFIX}'
             cam_paths = [_c for _c in zip_reader.namelist() if _c.find(prsp_root) != -1 and \
@@ -192,10 +200,11 @@ class Structured3DDataGen(DatasetBase):
             #     labels=a_labels)
 
             v_points, v_colors, v_labels = self._points2voxel((a_points, a_colors, a_labels), 0.01)
-            np.savez(os.path.join(dump_folder, f'{dump_name}_v001_points.npz'), points=v_points, \
-                colors=v_colors, labels=v_labels)
+            np.savez(dump_path, points=v_points, colors=v_colors, labels=v_labels)
 
     def view2pointcloud(self, proc_unit: ProcessUnit):
         rooms_list = self._get_rooms_list_by_types(proc_unit.room_types)
 
-        self._mp_view2pointcloud(rooms_list, proc_unit)
+        g_perf.multiple_processor(self._mp_view2pointcloud, rooms_list, 8, \
+            (proc_unit, ))
+        # self._mp_view2pointcloud(rooms_list, proc_unit)
