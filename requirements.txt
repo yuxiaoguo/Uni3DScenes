@@ -1,3 +1,8 @@
+pylint
 opencv-python
 numpy
 pandas
+scikit-image
+plyfile
+PyYAML
+pillow

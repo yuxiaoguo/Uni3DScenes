@@ -3,8 +3,9 @@
 import logging
 import argparse
 
-logging.basicConfig(format='[%(asctime)s] %(levelname)s: %(message)s', \
-    level=logging.DEBUG)
+from datasets import entry
+
+logging.basicConfig(format='[%(asctime)s] %(levelname)s: %(message)s', level=logging.INFO)
 
 
 def parse_arguments():
@@ -21,3 +22,5 @@ def parse_arguments():
 
 if __name__ == '__main__':
     (args, unknown) = parse_arguments()
+
+    entry.processing_entry(cfg_path=args.cfg_path, data_root=args.data_root)
