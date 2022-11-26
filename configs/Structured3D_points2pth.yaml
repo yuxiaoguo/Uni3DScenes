@@ -1,0 +1,14 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+# raw_data_process:
+#   assemble_class: 'Structured3DDataGen'
+#   process_pipelines:
+#     -
+#       assemble_function: view2pointcloud
+#       room_types: ['all']
+train_sets_process:
+  assemble_class: 'PointCloudDownStreaming'
+  process_pipelines:
+    -
+      assemble_function: segmentation
+      attrs: ['points', 'colors', 'labels']

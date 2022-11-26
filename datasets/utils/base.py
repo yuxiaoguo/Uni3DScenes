@@ -18,6 +18,16 @@ class ProcessUnit(DictRecursive):
         self.room_types = list([str()])
 
 
+class EntryConfig(DictRecursive):
+    """
+    Main entry
+    """
+    def __init__(self):
+        super().__init__()
+        self.assemble_class = str()
+        self.process_pipelines = list([ProcessUnit()])
+
+
 class DatasetBase:
     """
     The base class of dataset
