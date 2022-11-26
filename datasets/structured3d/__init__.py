@@ -144,16 +144,17 @@ class Structured3DDataGen(DatasetBase):
     def _points2voxel(attr_points: List[np.ndarray], res=0.005):
         p_points, p_colors, p_labels = attr_points
 
-        if not p_points.shape:
-            return list(), list(), list()
-        
-        vd_points = np.floor(p_points / res).astype(np.int64)
-        vd_max = np.max(vd_points, axis=0)
-        vd_min = np.min(vd_points, axis=0)
-        vd_box = np.cumprod([1, *(vd_max - vd_min)[:2]])
+        try:
+            vd_points = np.floor(p_points / res).astype(np.int64)
+            vd_max = np.max(vd_points, axis=0)
+            vd_min = np.min(vd_points, axis=0)
+            vd_box = np.cumprod([1, *(vd_max - vd_min)[:2]])
 
-        vd_indices = np.sum((vd_points - vd_min[np.newaxis, ...]) * vd_box[np.newaxis, ...], axis=-1)
-        _, vd_uni = np.unique(vd_indices, return_index=True)
+            vd_indices = np.sum((vd_points - vd_min[np.newaxis, ...]) * \
+                vd_box[np.newaxis, ...], axis=-1)
+            _, vd_uni = np.unique(vd_indices, return_index=True)
+        except ValueError:
+            return None, None, None
 
         return p_points[vd_uni], p_colors[vd_uni], p_labels[vd_uni]
 
@@ -200,6 +201,8 @@ class Structured3DDataGen(DatasetBase):
             #     labels=a_labels)
 
             v_points, v_colors, v_labels = self._points2voxel((a_points, a_colors, a_labels), 0.01)
+            if v_points is None:
+                continue
             np.savez(dump_path, points=v_points, colors=v_colors, labels=v_labels)
 
     def view2pointcloud(self, proc_unit: ProcessUnit):
