@@ -10,6 +10,7 @@ import yaml
 from datasets.utils.base import DatasetBase, EntryConfig
 from datasets.structured3d import Structured3DDataGen
 from trainsets.torch import PointCloudDownStreaming
+from data_statistics import CoreStatistics
 
 
 def processing_entry(cfg_dict: Dict, data_root: str):
@@ -35,7 +36,7 @@ def processing_entries(cfg_path: str, data_root: str):
     with open(cfg_path, encoding='utf-8') as cfg_fp:
         cfg_dict = yaml.load(cfg_fp, Loader=yaml.BaseLoader)
 
-    for e_key in ['raw_data_process', 'train_sets_process']:
+    for e_key in ['raw_data_process', 'statistics_process', 'train_sets_process']:
         if e_key not in cfg_dict:
             continue
         processing_entry(cfg_dict[e_key], data_root)
