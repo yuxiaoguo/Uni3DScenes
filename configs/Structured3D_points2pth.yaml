@@ -6,15 +6,15 @@
 #     -
 #       assemble_function: view2pointcloud
 #       room_types: ['all']
-statistics_process:
-  assemble_class: 'CoreStatistics'
-  process_pipelines:
-    -
-      assemble_function: distribution
-      attrs: ['category']
-# train_sets_process:
-#   assemble_class: 'PointCloudDownStreaming'
+# statistics_process:
+#   assemble_class: 'CoreStatistics'
 #   process_pipelines:
 #     -
-#       assemble_function: segmentation
-#       attrs: ['points', 'colors', 'labels']
+#       assemble_function: distribution
+#       attrs: ['category']
+train_sets_process:
+  assemble_class: 'PointCloudDownStreaming'
+  process_pipelines:
+    -
+      assemble_function: segmentation
+      attrs: ['points', 'colors', 'labels']

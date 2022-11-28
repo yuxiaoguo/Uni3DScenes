@@ -54,7 +54,7 @@ class CoreStatistics(StatisticsBase):
 
         mp_statistics = mp.Manager().list()
 
-        g_perf.multiple_processor(self.distribution_mp, target_files, 1, (mp_statistics, proc_unit))
+        g_perf.multiple_processor(self.distribution_mp, target_files, 8, (mp_statistics, proc_unit))
 
         ar_statistics = np.sum(np.asarray(mp_statistics), axis=0)
         print(np.argwhere(ar_statistics > 0)[..., 0])

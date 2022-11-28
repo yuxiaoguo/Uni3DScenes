@@ -83,8 +83,9 @@ class PointCloudDownStreaming(TaskBase):
         os.makedirs(output_dir, exist_ok=True)
 
         remapper = np.ones(150, dtype=np.int32) * (-100)
-        for i, x in enumerate([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39]):
-            remapper[x] = i
+        for i_id, s_id in enumerate([1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 14, 15,\
+            16, 17, 18, 19, 22, 24, 25, 32, 34, 35, 38, 39, 40]):
+            remapper[s_id] = i_id
 
         torch_writer = TorchWriter(output_dir)
 
