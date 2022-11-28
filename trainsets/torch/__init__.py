@@ -76,9 +76,9 @@ class PointCloudDownStreaming(TaskBase):
     """
     To deal with point cloud down-streaming task
     """
-    def segmentation_mp(self, samples: List[str], proc_unit: ProcessUnit, split=str, offset: int = 0, \
+    def _segmentation_mp(self, samples: List[str], proc_unit: ProcessUnit, split=str, offset=0, \
         worker_id: int = 0):
-        del offset, worker_id
+        del proc_unit, offset, worker_id
         output_dir = os.path.join(self.root_dir, 'torch_s3d', split)
         os.makedirs(output_dir, exist_ok=True)
 
@@ -96,7 +96,7 @@ class PointCloudDownStreaming(TaskBase):
             labels = remapper[sample_meta['labels']]
             torch_writer.write_item((points, colors, labels), os.path.splitext(sample)[0])
 
-    def split_samples(self, samples: List[str]):
+    def _split_samples(self, samples: List[str]):
         train_samples, val_samples, test_samples = list(), list(), list()
         for sample in samples:
             scene_id = int(sample.split('_')[1])
@@ -110,8 +110,8 @@ class PointCloudDownStreaming(TaskBase):
 
     def segmentation(self, proc_unit: ProcessUnit):
         point_cloud_dir = os.path.join(self.root_dir, 'point_cloud')
-        
-        train_samples, val_samples, test_samples = self.split_samples(os.listdir(point_cloud_dir))
-        g_perf.multiple_processor(self.segmentation_mp, train_samples, 8, (proc_unit, 'train'))
-        g_perf.multiple_processor(self.segmentation_mp, val_samples, 8, (proc_unit, 'val'))
-        g_perf.multiple_processor(self.segmentation_mp, test_samples, 8, (proc_unit, 'test'))
+
+        train_samples, val_samples, test_samples = self._split_samples(os.listdir(point_cloud_dir))
+        g_perf.multiple_processor(self._segmentation_mp, train_samples, 8, (proc_unit, 'train'))
+        g_perf.multiple_processor(self._segmentation_mp, val_samples, 8, (proc_unit, 'val'))
+        g_perf.multiple_processor(self._segmentation_mp, test_samples, 8, (proc_unit, 'test'))
