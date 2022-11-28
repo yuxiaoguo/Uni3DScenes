@@ -115,3 +115,7 @@ class PointCloudDownStreaming(TaskBase):
         g_perf.multiple_processor(self._segmentation_mp, train_samples, 8, (proc_unit, 'train'))
         g_perf.multiple_processor(self._segmentation_mp, val_samples, 8, (proc_unit, 'val'))
         g_perf.multiple_processor(self._segmentation_mp, test_samples, 8, (proc_unit, 'test'))
+"""
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+"""
