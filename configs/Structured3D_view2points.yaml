@@ -1,7 +1,0 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-assemble_class: 'Structured3DDataGen'
-process_pipelines:
-  -
-    assemble_function: view2pointcloud
-    room_types: ['all']

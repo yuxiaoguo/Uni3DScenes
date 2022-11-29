@@ -9,12 +9,13 @@ from typing import List, Tuple
 
 import cv2
 import numpy as np
-from PIL import Image as pil_image 
+from PIL import Image as pil_image
 
 from graphics_utils import g_io, g_math, g_perf
 
+from utils.config import ProcessUnit, EnvsConfig
 from .s3d_utils import S3DUtilize
-from ..utils.base import DatasetBase, ProcessUnit
+from ..base_dataset import DatasetBase
 
 
 class Structured3DDataGen(DatasetBase):
@@ -34,15 +35,14 @@ class Structured3DDataGen(DatasetBase):
     RGB_FILE = 'rgb_rawlight.png'
     DEPTH_FILE = 'depth.png'
 
-    def __init__(self, root_dir: str, proc_units: List[ProcessUnit]) -> None:
-        super().__init__(root_dir, proc_units)
-
-        self.scenes_dict = dict()
+    def __init__(self, proc_units: List[ProcessUnit], envs: EnvsConfig) -> None:
+        super().__init__(proc_units, envs)
+        self._zip_folder = None
 
     def _load_zips(self, filter_regex='Structured3D') -> g_io.GroupZipIO:
-        ctx_files = [f for f in os.listdir(self.root_dir) if filter_regex in f and \
+        ctx_files = [f for f in os.listdir(self._zip_folder) if filter_regex in f and \
             f.endswith('zip')]
-        zip_reader = g_io.GroupZipIO([os.path.join(self.root_dir, f) for f in ctx_files])
+        zip_reader = g_io.GroupZipIO([os.path.join(self._zip_folder, f) for f in ctx_files])
         return zip_reader
 
     def _get_rooms_list_by_types(self, room_types: List[str]) -> List[str]:
@@ -80,7 +80,8 @@ class Structured3DDataGen(DatasetBase):
         out_images = list()
         if info_flags & 2:
             # Load depth image
-            depth_image = zip_reader.read_image(f'{info_root}/{__class__.DEPTH_FILE}')[..., np.newaxis]
+            depth_image = zip_reader.read_image(f'{info_root}/{__class__.DEPTH_FILE}')\
+                [..., np.newaxis]
             depth_image[depth_image == 0] = 65535
             out_images.append(depth_image)
         if info_flags & 4:
@@ -97,7 +98,8 @@ class Structured3DDataGen(DatasetBase):
         return out_cams, out_images
 
     @staticmethod
-    def _view2points_prsp(cam_paras: List[np.ndarray], attr_images: List[np.ndarray], cos_thrsh=0.15):
+    def _view2points_prsp(cam_paras: List[np.ndarray], attr_images: List[np.ndarray],
+        cos_thrsh=0.15):
         depth_img, color_img, smnt_img = attr_images
         cam_r, cam_t, cam_hf = cam_paras
         img_size = np.asarray(depth_img.shape[:2])[::-1]
@@ -160,13 +162,13 @@ class Structured3DDataGen(DatasetBase):
 
     def _mp_view2pointcloud(self, rooms_list: List[str], proc_unit: ProcessUnit,\
         start_index=0, worker_id=0):
-        del start_index, worker_id
+        del start_index, worker_id, proc_unit
         zip_reader = self._load_zips()
 
-        dump_folder = os.path.join(self.root_dir, 'point_cloud')
+        dump_folder = os.path.join(self.envs.out_data_root, 'point_cloud')
         os.makedirs(dump_folder, exist_ok=True)
 
-        for r_idx, room_path in enumerate(rooms_list):
+        for _, room_path in enumerate(rooms_list):
             scene_id, _, room_id = room_path.split('/')
             dump_name = f'{scene_id}_{room_id}'
             dump_path = os.path.join(dump_folder, f'{dump_name}_v001_points.npz')
@@ -206,7 +208,11 @@ class Structured3DDataGen(DatasetBase):
             np.savez(dump_path, points=v_points, colors=v_colors, labels=v_labels)
 
     def view2pointcloud(self, proc_unit: ProcessUnit):
-        rooms_list = self._get_rooms_list_by_types(proc_unit.room_types)
+        attrs = proc_unit.attrs
+
+        self._zip_folder = self.envs.get_env_path(proc_unit.in_paths[0])
+
+        rooms_list = self._get_rooms_list_by_types(attrs['room_types'])
 
         g_perf.multiple_processor(self._mp_view2pointcloud, rooms_list, 8, \
             (proc_unit, ))

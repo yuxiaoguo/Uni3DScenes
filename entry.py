@@ -7,21 +7,19 @@ from typing import Dict
 
 import yaml
 
-from datasets.utils.base import DatasetBase, EntryConfig
+from utils.config import EntryConfig, EnvsConfig, StreamingTasks
+from datasets.base_dataset import DatasetBase
 from datasets.structured3d import Structured3DDataGen
-from trainsets.torch import PointCloudDownStreaming
-from data_statistics import CoreStatistics
+from training.point_cloud import PointCloudDownStreaming
+from data_statistics import PointCloudStatistics
 
 
-def processing_entry(cfg_dict: Dict, data_root: str):
+def processing_entry(entry_config: EntryConfig, envs: EnvsConfig):
     """
     Process a single entry
     """
-    entry_config = EntryConfig()
-    entry_config.load(cfg_dict)
-
-    assemble_instance: DatasetBase = globals()[entry_config.assemble_class](data_root, \
-        entry_config.process_pipelines)
+    assemble_instance: DatasetBase = globals()[entry_config.assemble_class](\
+        entry_config.process_pipelines, envs)
 
     assemble_instance.execute_pipeline()
 
@@ -33,10 +31,10 @@ def processing_entries(cfg_path: str, data_root: str):
         cfg_path (str): config path
         data_root (str): data root path
     """
-    with open(cfg_path, encoding='utf-8') as cfg_fp:
-        cfg_dict = yaml.load(cfg_fp, Loader=yaml.BaseLoader)
+    task_configs = StreamingTasks()
+    task_configs.load_from_yaml(cfg_path)
+    task_configs.envs.in_data_root = data_root
+    task_configs.envs.out_data_root = data_root
 
-    for e_key in ['raw_data_process', 'statistics_process', 'train_sets_process']:
-        if e_key not in cfg_dict:
-            continue
-        processing_entry(cfg_dict[e_key], data_root)
+    for t_cfg in task_configs.streaming_lines:
+        processing_entry(t_cfg, task_configs.envs)

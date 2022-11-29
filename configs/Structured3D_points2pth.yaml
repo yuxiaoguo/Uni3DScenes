@@ -1,20 +1,45 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
-# raw_data_process:
-#   assemble_class: 'Structured3DDataGen'
-#   process_pipelines:
-#     -
-#       assemble_function: view2pointcloud
-#       room_types: ['all']
-# statistics_process:
-#   assemble_class: 'CoreStatistics'
-#   process_pipelines:
-#     -
-#       assemble_function: distribution
-#       attrs: ['category']
-train_sets_process:
+
+# This is the processing pipeline from the multiple views semantic/RGB-D images to 3D point clouds.
+
+envs:
+  proc_alias: str3dr001mvp        # resolution 0.01m with perspective and panorama multiple views
+  io_paths:
+    # Raw data folder
+    raw_data_dir: $in_data_root$/raw
+    # Point cloud data folder
+    point_cloud_dir: $out_data_root$/point_cloud
+    # Analysis results folder and files
+    analysis_dir: $out_data_root$/analysis
+    num_points_dist_path: $analysis_dir$/points.xlsx
+    room_sizes_dist_path: $analysis_dir$/sizes.xlsx
+    category_dist_path: $analysis_dir$/categories.xlsx
+    # Training dataset folder
+    train_sets_dir: $out_data_root$/str3ds25v0
+
+streaming_lines:
+-
+  assemble_class: 'Structured3DDataGen'
+  process_pipelines:
+    -
+      assemble_function: view2pointcloud
+      attrs: {room_types: [all]}
+      in_paths: [raw_data_dir]
+      out_paths: [point_cloud_dir]
+-
+  assemble_class: 'PointCloudStatistics'
+  process_pipelines:
+    -
+      assemble_function: distribution
+      attrs: {scopes: [num_points, size_points, categories]}
+      in_paths: [point_cloud_dir]
+      out_paths: [num_points_dist_path, room_sizes_dist_path, category_dist_path]
+-
   assemble_class: 'PointCloudDownStreaming'
   process_pipelines:
     -
       assemble_function: segmentation
-      attrs: ['points', 'colors', 'labels']
+      attrs: {keys: 'points', 'colors', 'labels'}
+      in_paths: [point_cloud_dir]
+      out_paths: [train_sets_dir]
