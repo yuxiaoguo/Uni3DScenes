@@ -65,7 +65,13 @@ class PointCloudStatistics(MPEntryBase):
 
         all_points = np.asarray(list(all_dict.values())).reshape([-1])
         bin_points = np.bincount(all_points // proc_unit.attrs['stride'])
-        table.write_overall(np.arange(len(bin_points)), bin_points)
+
+        pdf = bin_points.astype(np.float32) / np.sum(bin_points)
+        cdf = np.cumsum(pdf)
+
+        table.write_overall(np.arange(len(bin_points)), pdf, 'PDF')
+        table.write_overall(np.arange(len(bin_points)), cdf, 'CDF')
+        table.write_overall(np.arange(len(bin_points)), bin_points, 'DF')
         table.write_items(['Points'], all_dict)
         table.close()
 
