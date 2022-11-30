@@ -56,13 +56,18 @@ class PointCloudStatistics(MPEntryBase):
         """
         Post statistics the number of points distribution
         """
+        out_path = self.envs.get_env_path(proc_unit.out_paths[0])
+        table = DistributionTable(out_path)
+
         all_dict = dict()
         for i_var in ipc_vars:
             all_dict.update(i_var)
 
-        out_path = self.envs.get_env_path(proc_unit.out_paths[0])
-        table = DistributionTable(out_path)
-        table.write(['Points'], None, all_dict)
+        all_points = np.asarray(list(all_dict.values())).reshape([-1])
+        bin_points = np.bincount(all_points // proc_unit.attrs['stride'])
+        table.write_overall(np.arange(len(bin_points)), bin_points)
+        table.write_items(['Points'], all_dict)
+        table.close()
 
     def num_points_distribution(self, sample: str, proc_unit: ProcessUnit, shared_vars: Dict):
         """
@@ -84,7 +89,8 @@ class PointCloudStatistics(MPEntryBase):
 
         out_path = self.envs.get_env_path(proc_unit.out_paths[0])
         table = DistributionTable(out_path)
-        table.write(np.arange(dist.shape[0], dtype=np.int32), dist)
+        table.write_overall(np.arange(dist.shape[0], dtype=np.int32), dist)
+        table.close()
 
     def category_distribution(self, sample: str, proc_unit: ProcessUnit, shared_vars: Dict):
         """
