@@ -19,27 +19,35 @@ envs:
     train_sets_dir: $out_data_root$/str3ds25v0
 
 streaming_lines:
--
-  assemble_class: 'Structured3DDataGen'
-  process_pipelines:
-    -
-      assemble_function: view2pointcloud
-      attrs: {room_types: [all]}
-      in_paths: [raw_data_dir]
-      out_paths: [point_cloud_dir]
+# -
+#   assemble_class: 'Structured3DDataGen'
+#   process_pipelines:
+#     -
+#       assemble_function: view2pointcloud
+#       attrs: {room_types: [all]}
+#       in_paths: [raw_data_dir]
+#       out_paths: [point_cloud_dir]
 -
   assemble_class: 'PointCloudStatistics'
   process_pipelines:
     -
-      assemble_function: distribution
-      attrs: {scopes: [num_points, size_points, categories]}
+      assemble_function: category_distribution
+      attrs: {num_categories: 41}
       in_paths: [point_cloud_dir]
-      out_paths: [num_points_dist_path, room_sizes_dist_path, category_dist_path]
--
-  assemble_class: 'PointCloudDownStreaming'
-  process_pipelines:
-    -
-      assemble_function: segmentation
-      attrs: {keys: 'points', 'colors', 'labels'}
-      in_paths: [point_cloud_dir]
-      out_paths: [train_sets_dir]
+      out_paths: [category_dist_path]
+    # -
+    #   assemble_function: num_points_distribution
+    #   in_paths: [point_cloud_dir]
+    #   out_paths: [num_points_dist_path]
+    # -
+    #   assemble_function: size_points_distribution
+    #   in_paths: [point_cloud_dir]
+    #   out_paths: [room_sizes_dist_path]
+# -
+#   assemble_class: 'PointCloudDownStreaming'
+#   process_pipelines:
+#     -
+#       assemble_function: segmentation
+#       attrs: {keys: 'points', 'colors', 'labels'}
+#       in_paths: [point_cloud_dir]
+#       out_paths: [train_sets_dir]

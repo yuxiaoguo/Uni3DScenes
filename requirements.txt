@@ -9,3 +9,4 @@ pillow
 torch
 torchvision
 torchaudio
+openpyxl
