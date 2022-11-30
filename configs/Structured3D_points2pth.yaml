@@ -35,10 +35,10 @@ streaming_lines:
       attrs: {num_categories: 41}
       in_paths: [point_cloud_dir]
       out_paths: [category_dist_path]
-    # -
-    #   assemble_function: num_points_distribution
-    #   in_paths: [point_cloud_dir]
-    #   out_paths: [num_points_dist_path]
+    -
+      assemble_function: num_points_distribution
+      in_paths: [point_cloud_dir]
+      out_paths: [num_points_dist_path]
     # -
     #   assemble_function: size_points_distribution
     #   in_paths: [point_cloud_dir]

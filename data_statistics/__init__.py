@@ -52,6 +52,28 @@ class PointCloudStatistics(MPEntryBase):
             post_func = getattr(self, f'post_{proc_unit.assemble_function}')
             post_func(proc_unit, [_f[proc_idx] for _f in ipc_vars])
 
+    def post_num_points_distribution(self, proc_unit: ProcessUnit, ipc_vars):
+        """
+        Post statistics the number of points distribution
+        """
+        all_dict = dict()
+        for i_var in ipc_vars:
+            all_dict.update(i_var)
+
+        out_path = self.envs.get_env_path(proc_unit.out_paths[0])
+        table = DistributionTable(out_path)
+        table.write(['Points'], None, all_dict)
+
+    def num_points_distribution(self, sample: str, proc_unit: ProcessUnit, shared_vars: Dict):
+        """
+        Statistics the number of points distribution
+        """
+        data_name = proc_unit.assemble_function
+        shared_vars.setdefault(data_name, dict())
+        data: Dict[str, np.ndarray] = self._load_sample_from_vars(sample, shared_vars)
+        sample_name = os.path.splitext(os.path.basename(sample))[0]
+        shared_vars[data_name][sample_name] = [data['points'].shape[0]]
+
     def post_category_distribution(self, proc_unit: ProcessUnit, ipc_vars):
         """
         Post statistics the category distribution
@@ -75,29 +97,3 @@ class PointCloudStatistics(MPEntryBase):
         data = self._load_sample_from_vars(sample, shared_vars)
         shared_vars[data_name] += np.bincount(np.reshape(data['labels'], [-1]), \
             minlength=num_categories)
-
-    # def _distribution_mp(self, samples, stat_out: List, proc_unit: ProcessUnit, \
-    #     offset=0, worker_id=0):
-    #     del offset, worker_id, proc_unit
-    #     label_dists = np.zeros(41, dtype=np.int64)
-    #     for sample in samples:
-    #         meta = np.load(sample)
-    #         labels = meta['labels']
-    #         label_dists += np.bincount(np.reshape(labels, [-1]), minlength=41)
-    #     stat_out.append(label_dists)
-
-    # def distribution(self, proc_unit: ProcessUnit):
-    #     point_cloud_folder = self.envs.get_env_path(proc_unit.in_paths[0])
-    #     point_cloud_files = [os.path.join(point_cloud_folder, _f) \
-    #         for _f in os.listdir(point_cloud_folder)]
-
-    #     mp_stat = mp.Manager().list()
-
-    #     g_perf.multiple_processor(self._distribution_mp, point_cloud_files, 8, (mp_stat, proc_unit))
-
-    #     ar_stat: np.ndarray = np.sum(np.asarray(mp_stat), axis=0)
-    #     ar_total: np.ndarray = np.sum(ar_stat)
-    #     print(np.argwhere(ar_stat > 0)[..., 0])
-
-    #     ar_dist = ar_stat.astype(np.float32) / ar_total.astype(np.float32)
-    #     print([f'{_d:.4f}' for _d in ar_dist[ar_stat > 0]])
