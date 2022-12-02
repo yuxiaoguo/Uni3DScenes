@@ -2,6 +2,8 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 """
+# pylint: disable=logging-fstring-interpolation
+import logging
 import re
 import multiprocessing as mp
 from abc import abstractmethod
@@ -95,7 +97,7 @@ class MPEntryBase(EntryBase):
     """
     def __init__(self, proc_units: List[ProcessUnit], envs: EnvsConfig) -> None:
         super().__init__(proc_units, envs)
-        self._enable_mp = False
+        self._enable_mp = True
         self._num_worker = 8
 
     @abstractmethod
@@ -119,7 +121,8 @@ class MPEntryBase(EntryBase):
         """
 
     def _mp_execute_pipeline(self, samples, ipc_vars: List, worker_offset=0, worker_id=0):
-        del worker_offset, worker_id
+        del worker_offset
+        logging.info(f'worker {worker_id} begin...')
         shared_vars = dict()
         for s_idx, sample in enumerate(samples):
             for proc_unit in self.proc_units:
@@ -129,11 +132,13 @@ class MPEntryBase(EntryBase):
         self._merged_within_processing(shared_vars, ipc_vars)
 
     def execute_pipeline(self):
+        logging.info(f'- Start to execute pipeline {self.__class__.__name__}')
         samples = self._sample_list()
         ipc_vars = mp.Manager().list()
         if self._enable_mp:
             g_perf.multiple_processor(self._mp_execute_pipeline, samples, workers=8, \
-                args=tuple(ipc_vars))
+                args=(ipc_vars, ))
         else:
             self._mp_execute_pipeline(samples, ipc_vars)
         self._merged_cross_processing(list(ipc_vars))
+        logging.info('- Finished to execute pipeline {self.__class__.__name__}')
