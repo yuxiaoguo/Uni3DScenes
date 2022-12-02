@@ -42,7 +42,7 @@ class NumPointsDistribution(DistFuncBase):
         """
         Statistics the number of points distribution
         """
-        data_name = self.proc_unit.assemble_function
+        data_name = self.proc_unit.name
         shared_vars.setdefault(data_name, dict())
         # data: Dict[str, np.ndarray] = self._load_sample_from_vars(sample, shared_vars)
         sample_name = os.path.splitext(os.path.basename(sample_name))[0]

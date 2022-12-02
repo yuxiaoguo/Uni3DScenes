@@ -41,8 +41,8 @@ class NearestNeighborDistribution(DistFuncBase):
         neigh_scaled_dist: np.ndarray = np.clip(top2_dist[..., 1] * bin_scale, 0, bin_size - 1)
         dist_bincount = np.bincount(neigh_scaled_dist.astype(np.int64), minlength=bin_size)
 
-        shared_vars.setdefault(self.proc_unit.assemble_function, list())
-        shared_vars[self.proc_unit.assemble_function].append(dist_bincount)
+        shared_vars.setdefault(self.proc_unit.name, list())
+        shared_vars[self.proc_unit.name].append(dist_bincount)
 
     def post(self, ipc_vars: List):
         attrs = __class__.Attrs().load(self.proc_unit.attrs)

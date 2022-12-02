@@ -17,7 +17,7 @@ class CategoryDistribution(DistFuncBase):
     def processing(self, data: Dict[str, np.ndarray], shared_vars: dict, sample_name: str = None):
         del sample_name
         num_categories = self.proc_unit.attrs['num_categories']
-        data_name = self.proc_unit.assemble_function
+        data_name = self.proc_unit.name
         shared_vars.setdefault(data_name, np.zeros(num_categories, dtype=np.int64))
         # data = self._load_sample_from_vars(sample, shared_vars)
         shared_vars[data_name] += np.bincount(np.reshape(data['labels'], [-1]), \

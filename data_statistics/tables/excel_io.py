@@ -3,7 +3,6 @@
 # Licensed under the MIT License.
 """
 import os
-from typing import Dict
 
 import openpyxl
 

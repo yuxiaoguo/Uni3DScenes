@@ -10,7 +10,7 @@ import numpy as np
 
 from utils.config import ProcessUnit, EnvsConfig, MPEntryBase
 
-from . import dist_func
+from . import proc_func
 
 
 class PointCloudStatistics(MPEntryBase):
@@ -19,12 +19,12 @@ class PointCloudStatistics(MPEntryBase):
     """
     def __init__(self, proc_units: List[ProcessUnit], envs: EnvsConfig) -> None:
         super().__init__(proc_units, envs)
-        self._enable_mp = False
+        # self._enable_mp = False
 
-        self.proc_func_dict: Dict[str, dist_func.DistFuncBase] = dict()
+        self.proc_func_dict: Dict[str, proc_func.DistFuncBase] = dict()
         for proc_unit in proc_units:
-            dist_cls: Type[dist_func.DistFuncBase] = getattr(dist_func, proc_unit.assemble_function)
-            self.proc_func_dict[proc_unit.assemble_function] = dist_cls(proc_unit, envs)
+            dist_cls: Type[proc_func.DistFuncBase] = getattr(proc_func, proc_unit.assemble_function)
+            self.proc_func_dict[proc_unit.name] = dist_cls(proc_unit, envs)
 
     def _sample_list(self):
         point_cloud_dir = self.envs.get_env_path(self.proc_units[0].in_paths[0])
@@ -45,16 +45,16 @@ class PointCloudStatistics(MPEntryBase):
         return shared_vars[sample_data]
 
     def _execute_proc_unit(self, sample: str, proc_unit: ProcessUnit, shared_vars: Dict):
-        proc_func = self.proc_func_dict[proc_unit.assemble_function]
+        proc_func = self.proc_func_dict[proc_unit.name]
         proc_func.processing(self._load_sample_from_vars(sample, shared_vars), shared_vars, sample)
 
     def _merged_within_processing(self, shared_vars: Dict, ipc_vars: List):
         ipc_info = list()
         for proc_unit in self.proc_units:
-            ipc_info.append(shared_vars[proc_unit.assemble_function])
+            ipc_info.append(shared_vars[proc_unit.name])
         ipc_vars.append(ipc_info)
 
     def _merged_cross_processing(self, ipc_vars):
         for proc_idx, proc_unit in enumerate(self.proc_units):
-            proc_func = self.proc_func_dict[proc_unit.assemble_function]
+            proc_func = self.proc_func_dict[proc_unit.name]
             proc_func.post([_f[proc_idx] for _f in ipc_vars])

@@ -16,6 +16,7 @@ envs:
     room_sizes_dist_path: $analysis_dir$/sizes.xlsx
     category_dist_path: $analysis_dir$/categories.xlsx
     nearest_neighbor_dist_path: $analysis_dir$/nearest.xlsx
+    top_view_dir: $analysis_dir$/top_view 
     # Training dataset folder
     train_sets_dir: $out_data_root$/str3ds25v0
 
@@ -31,29 +32,39 @@ streaming_lines:
 -
   assemble_class: 'PointCloudStatistics'
   process_pipelines:
+    # -
+    #   assemble_function: CategoryDistribution
+    #   name: categories
+    #   attrs: {num_categories: 41}
+    #   in_paths: [point_cloud_dir]
+    #   out_paths: [category_dist_path]
+    # -
+    #   assemble_function: NumPointsDistribution
+    #   name: num_points
+    #   attrs: {stride: 10000}
+    #   in_paths: [point_cloud_dir]
+    #   out_paths: [num_points_dist_path]
     -
-      assemble_function: CategoryDistribution
-      attrs: {num_categories: 41}
-      in_paths: [point_cloud_dir]
-      out_paths: [category_dist_path]
-    -
-      assemble_function: NumPointsDistribution
-      attrs: {stride: 10000}
-      in_paths: [point_cloud_dir]
-      out_paths: [num_points_dist_path]
-    -
-      assemble_function: NearestNeighborDistribution
+      assemble_function: NearestNeighborDistribution  # Time-consuming due to KD-Tree build
+      stride: 50
+      name: nearest_neighbor
       attrs: {stride: 0.001, max: 0.2}
       in_paths: [point_cloud_dir]
       out_paths: [nearest_neighbor_dist_path]
     # -
-    #   assemble_function: dist_points_distribution
+    #   assemble_function: TopViewVisualization
+    #   name: top_view_rgb
+    #   stride: 50
+    #   attrs: {stride: 100, resolution: 0.01, key: colors, top_axis: y_top}
     #   in_paths: [point_cloud_dir]
-    #   out_paths: [dist_points_distribution]
+    #   out_paths: [top_view_dir]
     # -
-    #   assemble_function: size_points_distribution
+    #   assemble_function: TopViewVisualization
+    #   name: top_view_label
+    #   stride: 50
+    #   attrs: {resolution: 0.01, key: labels, top_axis: y_top, color_scheme: nyu40}
     #   in_paths: [point_cloud_dir]
-    #   out_paths: [room_sizes_dist_path]
+    #   out_paths: [top_view_dir]
 # -
 #   assemble_class: 'PointCloudDownStreaming'
 #   process_pipelines:

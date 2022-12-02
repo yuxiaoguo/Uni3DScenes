@@ -18,6 +18,8 @@ class ProcessUnit(DictRecursive):
     def __init__(self):
         super().__init__()
         self.assemble_function = str()
+        self.name = str()
+        self.stride = 1
         self.attrs = dict()
         self.in_paths = list()
         self.out_paths = list()
@@ -119,8 +121,10 @@ class MPEntryBase(EntryBase):
     def _mp_execute_pipeline(self, samples, ipc_vars: List, worker_offset=0, worker_id=0):
         del worker_offset, worker_id
         shared_vars = dict()
-        for sample in samples:
+        for s_idx, sample in enumerate(samples):
             for proc_unit in self.proc_units:
+                if s_idx / proc_unit.stride != 0:
+                    continue
                 self._execute_proc_unit(sample, proc_unit, shared_vars)
         self._merged_within_processing(shared_vars, ipc_vars)
 
