@@ -3,16 +3,14 @@
 # Licensed under the MIT License.
 """
 import os
-import multiprocessing as mp
 
-from typing import List, Dict
+from typing import List, Dict, Type
 
 import numpy as np
 
-from graphics_utils import g_perf
-
-from .tables.excel_io import DistributionTable
 from utils.config import ProcessUnit, EnvsConfig, MPEntryBase
+
+from . import dist_func
 
 
 class PointCloudStatistics(MPEntryBase):
@@ -22,6 +20,11 @@ class PointCloudStatistics(MPEntryBase):
     def __init__(self, proc_units: List[ProcessUnit], envs: EnvsConfig) -> None:
         super().__init__(proc_units, envs)
         self._enable_mp = False
+
+        self.proc_func_dict: Dict[str, dist_func.DistFuncBase] = dict()
+        for proc_unit in proc_units:
+            dist_cls: Type[dist_func.DistFuncBase] = getattr(dist_func, proc_unit.assemble_function)
+            self.proc_func_dict[proc_unit.assemble_function] = dist_cls(proc_unit, envs)
 
     def _sample_list(self):
         point_cloud_dir = self.envs.get_env_path(self.proc_units[0].in_paths[0])
@@ -41,6 +44,10 @@ class PointCloudStatistics(MPEntryBase):
             shared_vars[sample_data] = np.load(sample)
         return shared_vars[sample_data]
 
+    def _execute_proc_unit(self, sample: str, proc_unit: ProcessUnit, shared_vars: Dict):
+        proc_func = self.proc_func_dict[proc_unit.assemble_function]
+        proc_func.processing(self._load_sample_from_vars(sample, shared_vars), shared_vars, sample)
+
     def _merged_within_processing(self, shared_vars: Dict, ipc_vars: List):
         ipc_info = list()
         for proc_unit in self.proc_units:
@@ -49,63 +56,5 @@ class PointCloudStatistics(MPEntryBase):
 
     def _merged_cross_processing(self, ipc_vars):
         for proc_idx, proc_unit in enumerate(self.proc_units):
-            post_func = getattr(self, f'post_{proc_unit.assemble_function}')
-            post_func(proc_unit, [_f[proc_idx] for _f in ipc_vars])
-
-    def post_num_points_distribution(self, proc_unit: ProcessUnit, ipc_vars):
-        """
-        Post statistics the number of points distribution
-        """
-        out_path = self.envs.get_env_path(proc_unit.out_paths[0])
-        table = DistributionTable(out_path)
-
-        all_dict = dict()
-        for i_var in ipc_vars:
-            all_dict.update(i_var)
-
-        all_points = np.asarray(list(all_dict.values())).reshape([-1])
-        bin_points = np.bincount(all_points // proc_unit.attrs['stride'])
-
-        pdf = bin_points.astype(np.float32) / np.sum(bin_points)
-        cdf = np.cumsum(pdf)
-
-        table.write_overall(np.arange(len(bin_points)), pdf, 'PDF')
-        table.write_overall(np.arange(len(bin_points)), cdf, 'CDF')
-        table.write_overall(np.arange(len(bin_points)), bin_points, 'DF')
-        table.write_items(['Points'], all_dict)
-        table.close()
-
-    def num_points_distribution(self, sample: str, proc_unit: ProcessUnit, shared_vars: Dict):
-        """
-        Statistics the number of points distribution
-        """
-        data_name = proc_unit.assemble_function
-        shared_vars.setdefault(data_name, dict())
-        data: Dict[str, np.ndarray] = self._load_sample_from_vars(sample, shared_vars)
-        sample_name = os.path.splitext(os.path.basename(sample))[0]
-        shared_vars[data_name][sample_name] = [data['points'].shape[0]]
-
-    def post_category_distribution(self, proc_unit: ProcessUnit, ipc_vars):
-        """
-        Post statistics the category distribution
-        """
-        count_raw = np.asarray(ipc_vars, dtype=np.float32)
-        count_sum = np.sum(count_raw, axis=0)
-        dist: np.ndarray = count_sum / np.sum(count_sum)
-
-        out_path = self.envs.get_env_path(proc_unit.out_paths[0])
-        table = DistributionTable(out_path)
-        table.write_overall(np.arange(dist.shape[0], dtype=np.int32), dist)
-        table.close()
-
-    def category_distribution(self, sample: str, proc_unit: ProcessUnit, shared_vars: Dict):
-        """
-        Statistics the category distribution
-        """
-        num_categories = proc_unit.attrs['num_categories']
-        data_name = proc_unit.assemble_function
-        shared_vars.setdefault(data_name, np.zeros(num_categories, \
-            dtype=np.int64))
-        data = self._load_sample_from_vars(sample, shared_vars)
-        shared_vars[data_name] += np.bincount(np.reshape(data['labels'], [-1]), \
-            minlength=num_categories)
+            proc_func = self.proc_func_dict[proc_unit.assemble_function]
+            proc_func.post([_f[proc_idx] for _f in ipc_vars])

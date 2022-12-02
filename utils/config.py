@@ -102,6 +102,10 @@ class MPEntryBase(EntryBase):
         Return the list of samples to be processed
         """
 
+    def _execute_proc_unit(self, sample: str, proc_unit: ProcessUnit, shared_vars: Dict):
+        proc_func = getattr(self, proc_unit.assemble_function)
+        proc_func(sample, proc_unit, shared_vars)
+
     def _merged_cross_processing(self, ipc_vars):
         """
         Merge all shared list information cross all processors
@@ -117,8 +121,7 @@ class MPEntryBase(EntryBase):
         shared_vars = dict()
         for sample in samples:
             for proc_unit in self.proc_units:
-                proc_func = getattr(self, proc_unit.assemble_function)
-                proc_func(sample, proc_unit, shared_vars)
+                self._execute_proc_unit(sample, proc_unit, shared_vars)
         self._merged_within_processing(shared_vars, ipc_vars)
 
     def execute_pipeline(self):

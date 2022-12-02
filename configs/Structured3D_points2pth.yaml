@@ -15,31 +15,41 @@ envs:
     num_points_dist_path: $analysis_dir$/points.xlsx
     room_sizes_dist_path: $analysis_dir$/sizes.xlsx
     category_dist_path: $analysis_dir$/categories.xlsx
+    nearest_neighbor_dist_path: $analysis_dir$/nearest.xlsx
     # Training dataset folder
     train_sets_dir: $out_data_root$/str3ds25v0
 
 streaming_lines:
-# -
-#   assemble_class: 'Structured3DDataGen'
-#   process_pipelines:
-#     -
-#       assemble_function: view2pointcloud
-#       attrs: {room_types: [all]}
-#       in_paths: [raw_data_dir]
-#       out_paths: [point_cloud_dir]
+-
+  assemble_class: 'Structured3DDataGen'
+  process_pipelines:
+    -
+      assemble_function: view2pointcloud
+      attrs: {room_types: [all]}
+      in_paths: [raw_data_dir]
+      out_paths: [point_cloud_dir]
 -
   assemble_class: 'PointCloudStatistics'
   process_pipelines:
     -
-      assemble_function: category_distribution
+      assemble_function: CategoryDistribution
       attrs: {num_categories: 41}
       in_paths: [point_cloud_dir]
       out_paths: [category_dist_path]
     -
-      assemble_function: num_points_distribution
+      assemble_function: NumPointsDistribution
       attrs: {stride: 10000}
       in_paths: [point_cloud_dir]
       out_paths: [num_points_dist_path]
+    -
+      assemble_function: NearestNeighborDistribution
+      attrs: {stride: 0.001, max: 0.2}
+      in_paths: [point_cloud_dir]
+      out_paths: [nearest_neighbor_dist_path]
+    # -
+    #   assemble_function: dist_points_distribution
+    #   in_paths: [point_cloud_dir]
+    #   out_paths: [dist_points_distribution]
     # -
     #   assemble_function: size_points_distribution
     #   in_paths: [point_cloud_dir]
