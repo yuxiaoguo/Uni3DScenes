@@ -123,7 +123,7 @@ class MPEntryBase(EntryBase):
         shared_vars = dict()
         for s_idx, sample in enumerate(samples):
             for proc_unit in self.proc_units:
-                if s_idx / proc_unit.stride != 0:
+                if s_idx % proc_unit.stride != 0:
                     continue
                 self._execute_proc_unit(sample, proc_unit, shared_vars)
         self._merged_within_processing(shared_vars, ipc_vars)

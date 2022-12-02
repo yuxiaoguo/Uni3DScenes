@@ -45,8 +45,8 @@ class PointCloudStatistics(MPEntryBase):
         return shared_vars[sample_data]
 
     def _execute_proc_unit(self, sample: str, proc_unit: ProcessUnit, shared_vars: Dict):
-        proc_func = self.proc_func_dict[proc_unit.name]
-        proc_func.processing(self._load_sample_from_vars(sample, shared_vars), shared_vars, sample)
+        func = self.proc_func_dict[proc_unit.name]
+        func.processing(self._load_sample_from_vars(sample, shared_vars), shared_vars, sample)
 
     def _merged_within_processing(self, shared_vars: Dict, ipc_vars: List):
         ipc_info = list()
@@ -56,5 +56,5 @@ class PointCloudStatistics(MPEntryBase):
 
     def _merged_cross_processing(self, ipc_vars):
         for proc_idx, proc_unit in enumerate(self.proc_units):
-            proc_func = self.proc_func_dict[proc_unit.name]
-            proc_func.post([_f[proc_idx] for _f in ipc_vars])
+            func = self.proc_func_dict[proc_unit.name]
+            func.post([_f[proc_idx] for _f in ipc_vars])
