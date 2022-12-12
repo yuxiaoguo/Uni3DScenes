@@ -7,11 +7,11 @@ from typing import List
 
 import numpy as np
 
-from .base import DistFuncBase
+from .base import FuncBase
 from ..tables.excel_io import DistributionTable
 
 
-class NumPointsDistribution(DistFuncBase):
+class NumPointsDistribution(FuncBase):
     """
     Distribution of the number of points in each sample
     """

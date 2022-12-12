@@ -6,11 +6,11 @@ from typing import List, Dict
 
 import numpy as np
 
-from .base import DistFuncBase
+from .base import FuncBase
 from ..tables.excel_io import DistributionTable
 
 
-class CategoryDistribution(DistFuncBase):
+class CategoryDistribution(FuncBase):
     """
     Object category distribution
     """

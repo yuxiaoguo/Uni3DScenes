@@ -141,4 +141,4 @@ class MPEntryBase(EntryBase):
         else:
             self._mp_execute_pipeline(samples, ipc_vars)
         self._merged_cross_processing(list(ipc_vars))
-        logging.info('- Finished to execute pipeline {self.__class__.__name__}')
+        logging.info(f'- Finished to execute pipeline {self.__class__.__name__}')

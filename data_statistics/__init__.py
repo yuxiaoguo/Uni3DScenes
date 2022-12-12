@@ -21,9 +21,9 @@ class PointCloudStatistics(MPEntryBase):
         super().__init__(proc_units, envs)
         # self._enable_mp = False
 
-        self.proc_func_dict: Dict[str, proc_func.DistFuncBase] = dict()
+        self.proc_func_dict: Dict[str, proc_func.FuncBase] = dict()
         for proc_unit in proc_units:
-            dist_cls: Type[proc_func.DistFuncBase] = getattr(proc_func, proc_unit.assemble_function)
+            dist_cls: Type[proc_func.FuncBase] = getattr(proc_func, proc_unit.assemble_function)
             self.proc_func_dict[proc_unit.name] = dist_cls(proc_unit, envs)
 
     def _sample_list(self):
@@ -51,10 +51,11 @@ class PointCloudStatistics(MPEntryBase):
     def _merged_within_processing(self, shared_vars: Dict, ipc_vars: List):
         ipc_info = list()
         for proc_unit in self.proc_units:
-            ipc_info.append(shared_vars[proc_unit.name])
+            if proc_unit.name in shared_vars:
+                ipc_info.append(shared_vars[proc_unit.name])
         ipc_vars.append(ipc_info)
 
     def _merged_cross_processing(self, ipc_vars):
         for proc_idx, proc_unit in enumerate(self.proc_units):
             func = self.proc_func_dict[proc_unit.name]
-            func.post([_f[proc_idx] for _f in ipc_vars])
+            func.post([_f[proc_idx] for _f in ipc_vars if _f])

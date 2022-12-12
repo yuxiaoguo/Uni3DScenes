@@ -9,11 +9,11 @@ from scipy.spatial import cKDTree
 
 from graphics_utils import g_cfg
 
-from .base import DistFuncBase
+from .base import FuncBase
 from ..tables.excel_io import DistributionTable
 
 
-class NearestNeighborDistribution(DistFuncBase):
+class NearestNeighborDistribution(FuncBase):
     """
     Distribution of the distance of nearest neighborhood
     """

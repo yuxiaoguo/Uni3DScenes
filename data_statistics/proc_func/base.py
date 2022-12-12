@@ -9,7 +9,7 @@ import numpy as np
 from utils.config import ProcessUnit, EnvsConfig
 
 
-class DistFuncBase:
+class FuncBase:
     """
     The basic class of distribution statistics
     """
