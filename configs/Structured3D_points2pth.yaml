@@ -7,9 +7,10 @@ envs:
   proc_alias: str3dr001mvp        # resolution 0.01m with perspective and panorama multiple views
   io_paths:
     # Raw data folder
-    raw_data_dir: $in_data_root$/raw
+    raw_data_dir: $in_data_root$
     # Point cloud data folder
-    point_cloud_dir: $out_data_root$/point_cloud
+    point_cloud_dir: $out_data_root$/points
+    semantic_dir: $out_data_root$/semantic_mask
     # Analysis results folder and files
     analysis_dir: $out_data_root$/analysis
     num_points_dist_path: $analysis_dir$/points.xlsx
@@ -29,7 +30,23 @@ streaming_lines:
       assemble_function: view2pointcloud
       attrs: {room_types: [all]}
       in_paths: [raw_data_dir]
-      out_paths: [point_cloud_dir]
+      out_paths: [point_cloud_dir, semantic_dir]
+-
+  assemble_class: 'PointCloudStatistics'
+  process_pipelines:
+    -
+      assemble_function: PLY3DVisualization
+      name: 3d_rgb
+      stride: 50
+      in_paths: [point_cloud_dir]
+      out_paths: [3d_vis_dir]
+    -
+      assemble_function: PLY3DVisualization
+      name: 3d_label
+      attrs: {color_scheme: nyu40}
+      stride: 50
+      in_paths: [point_cloud_dir, semantic_dir]
+      out_paths: [3d_vis_dir]
 # -
 #   assemble_class: 'PointCloudStatistics'
 #   process_pipelines:
@@ -52,23 +69,7 @@ streaming_lines:
     #   attrs: {stride: 0.001, max: 0.2}
     #   in_paths: [point_cloud_dir]
     #   out_paths: [nearest_neighbor_dist_path]
--
-  assemble_class: 'PointCloudStatistics'
-  process_pipelines:
-    -
-      assemble_function: PLY3DVisualization
-      name: 3d_rgb
-      stride: 50
-      attrs: {key_pos: points, key_vis: colors}
-      in_paths: [point_cloud_dir]
-      out_paths: [3d_vis_dir]
-    -
-      assemble_function: PLY3DVisualization
-      name: 3d_label
-      stride: 50
-      attrs: {key_pos: points, key_vis: labels, color_scheme: nyu40}
-      in_paths: [point_cloud_dir]
-      out_paths: [3d_vis_dir]
+
     # -
     #   assemble_function: TopViewVisualization
     #   name: top_view_rgb

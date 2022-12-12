@@ -5,6 +5,7 @@
 # pylint: disable=no-member
 import os
 import io
+import pickle
 from typing import List, Tuple
 
 import cv2
@@ -20,7 +21,12 @@ from ..base_dataset import DatasetBase
 
 class Structured3DDataGen(DatasetBase):
     """
-    Dataset generation for Structured3D
+    Dataset generation for Structured3D.
+
+    Two separated folders will be created in target folder -- points and semantic_mask.
+        Points will be saved a .bin file with raw shape [N, 6] (3 for XYZ, 3 for RGB)
+        and data type np.float32. Semantic mask will be saved a .bin file with raw shape
+        [N] and data type np.int64.
     """
     IMAGE_PREFIX = '/2D_rendering'
 
@@ -143,7 +149,8 @@ class Structured3DDataGen(DatasetBase):
         return points[all_valid], color_img[all_valid], smnt_img[all_valid]
 
     @staticmethod
-    def _points2voxel(attr_points: List[np.ndarray], res=0.005):
+    def _points2voxel(attr_points: List[np.ndarray], res=0.005) ->\
+        Tuple[np.ndarray, np.ndarray, np.ndarray]:
         p_points, p_colors, p_labels = attr_points
 
         try:
@@ -162,17 +169,20 @@ class Structured3DDataGen(DatasetBase):
 
     def _mp_view2pointcloud(self, rooms_list: List[str], proc_unit: ProcessUnit,\
         start_index=0, worker_id=0):
-        del start_index, worker_id, proc_unit
+        del start_index, worker_id
         zip_reader = self._load_zips()
 
-        dump_folder = os.path.join(self.envs.out_data_root, 'point_cloud')
-        os.makedirs(dump_folder, exist_ok=True)
+        points_folder = self.envs.get_env_path(proc_unit.out_paths[0])
+        os.makedirs(points_folder, exist_ok=True)
+        semantics_folder = self.envs.get_env_path(proc_unit.out_paths[1])
+        os.makedirs(semantics_folder, exist_ok=True)
 
         for _, room_path in enumerate(rooms_list):
             scene_id, _, room_id = room_path.split('/')
-            dump_name = f'{scene_id}_{room_id}'
-            dump_path = os.path.join(dump_folder, f'{dump_name}_v001_points.npz')
-            if os.path.exists(dump_path):
+            dump_name = f'{scene_id}_{room_id}_1cm.bin'
+            points_path = os.path.join(points_folder, dump_name)
+            semantics_path = os.path.join(semantics_folder, dump_name)
+            if os.path.exists(points_path):
                 continue
 
             prsp_root = f'{room_path}{__class__.PERSPECTIVE_PREFIX}'
@@ -199,16 +209,27 @@ class Structured3DDataGen(DatasetBase):
             a_points = np.concatenate([_i[0] for _i in all_infos], axis=0)
             a_colors = np.concatenate([_i[1] for _i in all_infos], axis=0)
             a_labels = np.concatenate([_i[2] for _i in all_infos], axis=0)
-            # np.savez(f'{dump_name}_raw_points.npz', points=a_points, colors=a_colors, \
-            #     labels=a_labels)
 
             v_points, v_colors, v_labels = self._points2voxel((a_points, a_colors, a_labels), 0.01)
             if v_points is None:
                 continue
-            np.savez(dump_path, points=v_points, colors=v_colors, labels=v_labels)
+
+            # Convert Y-top to Z-top
+            v_points = v_points[..., [0, 2, 1]]
+
+            np.concatenate([v_points.astype(np.float32), v_colors.astype(np.float32)],\
+                 axis=-1).tofile(points_path)
+            v_labels.astype(np.int64).tofile(semantics_path)
 
     def view2pointcloud(self, proc_unit: ProcessUnit):
         attrs = proc_unit.attrs
+
+        desc_dir = os.path.join(self.envs.out_data_root, 'desc')
+        os.makedirs(desc_dir, exist_ok=True)
+        with open(os.path.join(desc_dir, proc_unit.out_paths[0]), 'wb') as b_fp:
+            pickle.dump(np.zeros([0, 6], np.float32), b_fp)
+        with open(os.path.join(desc_dir, proc_unit.out_paths[1]), 'wb') as b_fp:
+            pickle.dump(np.zeros([0], np.int64), b_fp)
 
         self._zip_folder = self.envs.get_env_path(proc_unit.in_paths[0])
 

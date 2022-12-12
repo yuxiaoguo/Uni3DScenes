@@ -23,18 +23,18 @@ def processing_entry(entry_config: EntryConfig, envs: EnvsConfig):
 
     assemble_instance.execute_pipeline()
 
-def processing_entries(cfg_path: str, data_root: str):
+def processing_entries(cfg_path: str, data_in: str, data_out: str):
     """
     The entry of dataset processing
 
     Args:
         cfg_path (str): config path
-        data_root (str): data root path
+        data_in (str): data root path
     """
     task_configs = StreamingTasks()
     task_configs.load_from_yaml(cfg_path)
-    task_configs.envs.in_data_root = data_root
-    task_configs.envs.out_data_root = data_root
+    task_configs.envs.in_data_root = data_in
+    task_configs.envs.out_data_root = data_out
 
     for t_cfg in task_configs.streaming_lines:
         processing_entry(t_cfg, task_configs.envs)
