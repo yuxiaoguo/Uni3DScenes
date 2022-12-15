@@ -11,7 +11,7 @@ from utils.config import EntryConfig, EnvsConfig, StreamingTasks
 from datasets.base_dataset import DatasetBase
 from datasets.structured3d import Structured3DDataGen
 from training.point_cloud import PointCloudDownStreaming
-from data_statistics import PointCloudStatistics
+from data_processing import SampleWiseProcessing
 
 
 def processing_entry(entry_config: EntryConfig, envs: EnvsConfig):

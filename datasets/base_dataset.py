@@ -12,7 +12,7 @@ class DatasetBase(EntryBase):
     The base class of dataset
     """
     @abstractmethod
-    def view2pointcloud(self, proc_unit: ProcessUnit):
+    def format_dataset(self, proc_unit: ProcessUnit):
         """
         Construct 3D point cloud from views
         """

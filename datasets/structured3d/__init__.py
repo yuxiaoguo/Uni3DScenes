@@ -5,8 +5,9 @@
 # pylint: disable=no-member
 import os
 import io
+import json
 import pickle
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 import cv2
 import numpy as np
@@ -14,6 +15,7 @@ from PIL import Image as pil_image
 
 from graphics_utils import g_io, g_math, g_perf
 
+from utils.palette import nyu40_color_palette
 from utils.config import ProcessUnit, EnvsConfig
 from .s3d_utils import S3DUtilize
 from ..base_dataset import DatasetBase
@@ -41,6 +43,8 @@ class Structured3DDataGen(DatasetBase):
     RGB_FILE = 'rgb_rawlight.png'
     DEPTH_FILE = 'depth.png'
 
+    ANNO_FILE = 'bbox_3d.json'
+
     def __init__(self, proc_units: List[ProcessUnit], envs: EnvsConfig) -> None:
         super().__init__(proc_units, envs)
         self._zip_folder = None
@@ -63,8 +67,19 @@ class Structured3DDataGen(DatasetBase):
         return rooms_list
 
     @staticmethod
-    def _read_camera_and_image(zip_reader: g_io.GroupZipIO, cam_path: str, info_flags: int, \
+    def read_camera_and_image(zip_reader: g_io.GroupZipIO, cam_path: str, info_flags: int, \
         info_root: str) -> Tuple[List, List[np.ndarray]]:
+        """
+        Read camera poses and images from GroupZipIO
+
+        Args:
+            zip_reader (g_io.GroupZipIO): GroupZipIO instance
+            cam_path (str): the relative path of camera
+            info_flags (int): the flag of the type of images to be read
+
+        Returns:
+            Tuple[List, List[np.ndarray]]: Camera information and a list of images
+        """
         if info_root is None:
             info_root = cam_path[:cam_path.rfind('/')]
 
@@ -104,8 +119,20 @@ class Structured3DDataGen(DatasetBase):
         return out_cams, out_images
 
     @staticmethod
-    def _view2points_prsp(cam_paras: List[np.ndarray], attr_images: List[np.ndarray],
+    def view2points_prsp(cam_paras: List[np.ndarray], attr_images: List[np.ndarray],
         cos_thrsh=0.15):
+        """
+        View to 3D points casting of a single perspective image
+
+        Args:
+            cam_paras (List[np.ndarray]): camera parameters
+            attr_images (List[np.ndarray]): a list of images to be casted
+            cos_thrsh (float, optional): the cosine threshold to filtering
+                interpolated depth. Defaults to 0.15.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray, np.ndarray]
+        """
         depth_img, color_img, smnt_img = attr_images
         cam_r, cam_t, cam_hf = cam_paras
         img_size = np.asarray(depth_img.shape[:2])[::-1]
@@ -128,7 +155,17 @@ class Structured3DDataGen(DatasetBase):
         return v_points[all_valid], color_img[all_valid], smnt_img[all_valid]
 
     @staticmethod
-    def _view2points_pano(cam_paras: List[np.ndarray], attr_images: List[np.ndarray]):
+    def view2points_pano(cam_paras: List[np.ndarray], attr_images: List[np.ndarray]):
+        """
+        View to 3D points casting of a single panoramic image
+
+        Args:
+            cam_paras (List[np.ndarray]): camera parameters
+            attr_images (List[np.ndarray]): a list of images to be casted
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray, np.ndarray]
+        """
         depth_img, color_img, smnt_img = attr_images
         _, cam_t, _ = cam_paras
         p_h, p_w = attr_images[0].shape[:2]
@@ -167,7 +204,73 @@ class Structured3DDataGen(DatasetBase):
 
         return p_points[vd_uni], p_colors[vd_uni], p_labels[vd_uni]
 
-    def _mp_view2pointcloud(self, rooms_list: List[str], proc_unit: ProcessUnit,\
+    @staticmethod
+    def _view2points(zip_reader: g_io.GroupZipIO, room_path) -> \
+        Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        prsp_root = f'{room_path}{__class__.PERSPECTIVE_PREFIX}'
+        cam_paths = [_c for _c in zip_reader.namelist() if _c.find(prsp_root) != -1 and \
+            _c.find(__class__.PRSP_CAM_FILE) != -1]
+        all_infos = list()
+        for cam_path in cam_paths:
+            cam_paras, attr_images = __class__.read_camera_and_image(zip_reader, cam_path, 15, None)
+            r_points, r_colors, r_labels = __class__.view2points_prsp(cam_paras, attr_images)
+            all_infos.append((r_points, r_colors, r_labels))
+
+        pano_cam_root = f'{room_path}{__class__.PANO_CAM_PREFIX}'
+        cam_paths = [_c for _c in zip_reader.namelist() if _c.find(pano_cam_root) != -1 and \
+            _c.find(__class__.PANO_CAM_FILE) != -1]
+        for cam_path in cam_paths:
+            pano_root = cam_path[:cam_path.rfind('/')]
+            pano_root = pano_root[:pano_root.rfind('/')]
+            pano_root = f'{pano_root}{__class__.PANORAMIC_PREFIX}'
+            cam_paras, attr_images = __class__.read_camera_and_image(zip_reader, cam_path, 15, \
+                pano_root)
+            r_points, r_colors, r_labels = __class__.view2points_pano(cam_paras, attr_images)
+            all_infos.append((r_points, r_colors, r_labels))
+
+        a_points = np.concatenate([_i[0] for _i in all_infos], axis=0)
+        a_colors = np.concatenate([_i[1] for _i in all_infos], axis=0)
+        a_labels = np.concatenate([_i[2] for _i in all_infos], axis=0)
+
+        a_points = a_points[..., [2, 0, 1]]  # Convert Y-top to Z-top
+        return a_points, a_colors, a_labels
+
+    @staticmethod
+    def _read_instance_infos(zip_reader: g_io.GroupZipIO, room_path: str, \
+        points: np.ndarray, labels: np.ndarray, min_pts=50):
+        scene_id, _, _  = room_path.split('/')
+        boxes_info: List[Dict] = json.loads(zip_reader.read(f'{scene_id}/{__class__.ANNO_FILE}'))
+
+        rb_idx = 0  # room bounding box ID
+        for box_info in boxes_info:
+            # b_id = int(box_info['ID'])
+            centroid = np.asarray(box_info['centroid'], dtype=np.float32) / 1000
+            coeffs = np.asarray(box_info['coeffs'], dtype=np.float32) / 1000
+            basis = np.asarray(box_info['basis'], dtype=np.float32)
+            obb_8pts = S3DUtilize.get_8points_bounding_box(basis, coeffs, centroid)
+
+            box_min = np.min(obb_8pts, axis=0, keepdims=True)
+            box_max = np.max(obb_8pts, axis=0, keepdims=True)
+
+            point_max_mask = np.all(points < box_max, axis=1)
+            point_min_mask = np.all(points > box_min, axis=1)
+            point_mask = np.logical_and(point_max_mask, point_min_mask)
+            box_points: np.ndarray = points[point_mask]
+            if box_points.size < min_pts:
+                continue
+
+            box_instances = labels[point_mask][..., 0]
+            instance_id, instance_count = np.unique(box_instances, return_counts=True)
+            instance_id = instance_id[np.argmax(instance_count)]
+
+            instance_points = box_points[box_instances == instance_id]
+            ip_box_min = np.min(instance_points, axis=0)
+            ip_box_max = np.max(instance_points, axis=0)
+            dimension = np.maximum(centroid - ip_box_min, ip_box_max - centroid)
+
+            rb_idx += 1
+
+    def _mp_format_dataset(self, rooms_list: List[str], proc_unit: ProcessUnit,\
         start_index=0, worker_id=0):
         del start_index, worker_id
         zip_reader = self._load_zips()
@@ -176,52 +279,32 @@ class Structured3DDataGen(DatasetBase):
         os.makedirs(points_folder, exist_ok=True)
         semantics_folder = self.envs.get_env_path(proc_unit.out_paths[1])
         os.makedirs(semantics_folder, exist_ok=True)
+        instance_folder = self.envs.get_env_path(proc_unit.out_paths[2])
+        os.makedirs(instance_folder, exist_ok=True)
 
         for _, room_path in enumerate(rooms_list):
             scene_id, _, room_id = room_path.split('/')
             dump_name = f'{scene_id}_{room_id}_1cm.bin'
             points_path = os.path.join(points_folder, dump_name)
             semantics_path = os.path.join(semantics_folder, dump_name)
-            if os.path.exists(points_path):
+            instance_path = os.path.join(instance_folder, dump_name)
+            if np.all([os.path.exists(_path) for _path in \
+                [points_path, semantics_path, instance_path]]):
                 continue
 
-            prsp_root = f'{room_path}{__class__.PERSPECTIVE_PREFIX}'
-            cam_paths = [_c for _c in zip_reader.namelist() if _c.find(prsp_root) != -1 and \
-                _c.find(__class__.PRSP_CAM_FILE) != -1]
-            all_infos = list()
-            for cam_path in cam_paths:
-                cam_paras, attr_images = self._read_camera_and_image(zip_reader, cam_path, 15, None)
-                r_points, r_colors, r_labels = self._view2points_prsp(cam_paras, attr_images)
-                all_infos.append((r_points, r_colors, r_labels))
-
-            pano_cam_root = f'{room_path}{__class__.PANO_CAM_PREFIX}'
-            cam_paths = [_c for _c in zip_reader.namelist() if _c.find(pano_cam_root) != -1 and \
-                _c.find(__class__.PANO_CAM_FILE) != -1]
-            for cam_path in cam_paths:
-                pano_root = cam_path[:cam_path.rfind('/')]
-                pano_root = pano_root[:pano_root.rfind('/')]
-                pano_root = f'{pano_root}{__class__.PANORAMIC_PREFIX}'
-                cam_paras, attr_images = self._read_camera_and_image(zip_reader, cam_path, 15, \
-                    pano_root)
-                r_points, r_colors, r_labels = self._view2points_pano(cam_paras, attr_images)
-                all_infos.append((r_points, r_colors, r_labels))
-
-            a_points = np.concatenate([_i[0] for _i in all_infos], axis=0)
-            a_colors = np.concatenate([_i[1] for _i in all_infos], axis=0)
-            a_labels = np.concatenate([_i[2] for _i in all_infos], axis=0)
-
+            # Step 1: Read images and make point clouds
+            a_points, a_colors, a_labels = self._view2points(zip_reader, room_path)
             v_points, v_colors, v_labels = self._points2voxel((a_points, a_colors, a_labels), 0.01)
             if v_points is None:
                 continue
-
-            # Convert Y-top to Z-top
-            v_points = v_points[..., [0, 2, 1]]
-
             np.concatenate([v_points.astype(np.float32), v_colors.astype(np.float32)],\
                  axis=-1).tofile(points_path)
             v_labels.astype(np.int64).tofile(semantics_path)
 
-    def view2pointcloud(self, proc_unit: ProcessUnit):
+            # Step 2: Read bounding box information
+            self._read_instance_infos(zip_reader, room_path, v_points, v_labels)
+
+    def format_dataset(self, proc_unit: ProcessUnit):
         attrs = proc_unit.attrs
 
         desc_dir = os.path.join(self.envs.out_data_root, 'desc')
@@ -235,6 +318,5 @@ class Structured3DDataGen(DatasetBase):
 
         rooms_list = self._get_rooms_list_by_types(attrs['room_types'])
 
-        g_perf.multiple_processor(self._mp_view2pointcloud, rooms_list, 8, \
+        g_perf.multiple_processor(self._mp_format_dataset, rooms_list, 8, \
             (proc_unit, ))
-        # self._mp_view2pointcloud(rooms_list, proc_unit)

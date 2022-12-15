@@ -52,3 +52,30 @@ class S3DUtilize(object):
         cam_n = np.cross(cam_front, cam_up)
         cam_m = np.stack((cam_front, cam_up, cam_n), axis=1).astype(np.float32)
         return cam_m
+
+    @staticmethod
+    def get_8points_bounding_box(basis, coeffs, centroid):
+        """
+        Get the 8 corners from the bounding box parameters
+        """
+        corners = np.zeros((8, 3))
+        coeffs = np.abs(coeffs)
+        corners[0, :] = -basis[0, :] * coeffs[0] + basis[1, :] * \
+            coeffs[1] + basis[2, :] * coeffs[2]
+        corners[1, :] = basis[0, :] * coeffs[0] + basis[1, :] * \
+            coeffs[1] + basis[2, :] * coeffs[2]
+        corners[2, :] = basis[0, :] * coeffs[0] + -basis[1, :] * \
+            coeffs[1] + basis[2, :] * coeffs[2]
+        corners[3, :] = -basis[0, :] * coeffs[0] + -basis[1, :] * \
+            coeffs[1] + basis[2, :] * coeffs[2]
+
+        corners[4, :] = -basis[0, :] * coeffs[0] + basis[1, :] * \
+            coeffs[1] + -basis[2, :] * coeffs[2]
+        corners[5, :] = basis[0, :] * coeffs[0] + basis[1, :] * \
+            coeffs[1] + -basis[2, :] * coeffs[2]
+        corners[6, :] = basis[0, :] * coeffs[0] + -basis[1, :] * \
+            coeffs[1] + -basis[2, :] * coeffs[2]
+        corners[7, :] = -basis[0, :] * coeffs[0] + -basis[1, :] * \
+            coeffs[1] + -basis[2, :] * coeffs[2]
+        corners = corners + np.tile(centroid, (8, 1))
+        return corners

@@ -11,6 +11,8 @@ envs:
     # Point cloud data folder
     point_cloud_dir: $out_data_root$/points
     semantic_dir: $out_data_root$/semantic_mask
+    anno_dir: $out_data_root$/anno_mask
+    instance_dir: $out_data_root$/instance_mask
     # Analysis results folder and files
     analysis_dir: $out_data_root$/analysis
     num_points_dist_path: $analysis_dir$/points.xlsx
@@ -27,23 +29,24 @@ streaming_lines:
   assemble_class: 'Structured3DDataGen'
   process_pipelines:
     -
-      assemble_function: view2pointcloud
+      assemble_function: format_dataset
       attrs: {room_types: [all]}
       in_paths: [raw_data_dir]
-      out_paths: [point_cloud_dir, semantic_dir]
+      out_paths: [point_cloud_dir, semantic_dir, instance_dir, anno_dir]
 -
-  assemble_class: 'PointCloudStatistics'
+  assemble_class: 'SampleWiseProcessing'
   process_pipelines:
     -
       assemble_function: PLY3DVisualization
       name: 3d_rgb
+      attrs: {w_boxes: 1, color_scheme: nyu40}
       stride: 50
       in_paths: [point_cloud_dir]
       out_paths: [3d_vis_dir]
     -
       assemble_function: PLY3DVisualization
       name: 3d_label
-      attrs: {color_scheme: nyu40}
+      attrs: {w_labels: 1, color_scheme: nyu40}
       stride: 50
       in_paths: [point_cloud_dir, semantic_dir]
       out_paths: [3d_vis_dir]

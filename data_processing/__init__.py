@@ -14,7 +14,7 @@ from utils.config import ProcessUnit, EnvsConfig, MPEntryBase
 from . import proc_func
 
 
-class PointCloudStatistics(MPEntryBase):
+class SampleWiseProcessing(MPEntryBase):
     """
     Statistics for point cloud data
     """
