@@ -240,7 +240,8 @@ class Structured3DDataGen(DatasetBase):
     def _read_instance_infos(zip_reader: g_io.GroupZipIO, room_path: str, \
         points: np.ndarray, labels: np.ndarray, min_pts=50) -> Dict:
         scene_id, _, _  = room_path.split('/')
-        anno_file = f'{scene_id}/{__class__.ANNO_FILE}'
+        anno_file, = [_f for _f in zip_reader.namelist() if \
+            _f.find(f'{scene_id}/{__class__.ANNO_FILE}') != -1]
         boxes_info: List[Dict] = json.loads(zip_reader.read(anno_file))
 
         anno_infos = Annotations()
