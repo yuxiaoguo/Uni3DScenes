@@ -15,10 +15,11 @@ from PIL import Image as pil_image
 
 from graphics_utils import g_io, g_math, g_perf
 
-from utils.palette import nyu40_color_palette
 from utils.config import ProcessUnit, EnvsConfig
+from utils.labels.nyu_40 import NYU40
 from .s3d_utils import S3DUtilize
 from ..base_dataset import DatasetBase
+from ..protocol.mmdet3d_scannet import Annotations
 
 
 class Structured3DDataGen(DatasetBase):
@@ -237,10 +238,12 @@ class Structured3DDataGen(DatasetBase):
 
     @staticmethod
     def _read_instance_infos(zip_reader: g_io.GroupZipIO, room_path: str, \
-        points: np.ndarray, labels: np.ndarray, min_pts=50):
+        points: np.ndarray, labels: np.ndarray, min_pts=50) -> Dict:
         scene_id, _, _  = room_path.split('/')
-        boxes_info: List[Dict] = json.loads(zip_reader.read(f'{scene_id}/{__class__.ANNO_FILE}'))
+        anno_file = f'{scene_id}/{__class__.ANNO_FILE}'
+        boxes_info: List[Dict] = json.loads(zip_reader.read(anno_file))
 
+        anno_infos = Annotations()
         rb_idx = 0  # room bounding box ID
         for box_info in boxes_info:
             # b_id = int(box_info['ID'])
@@ -268,7 +271,22 @@ class Structured3DDataGen(DatasetBase):
             ip_box_max = np.max(instance_points, axis=0)
             dimension = np.maximum(centroid - ip_box_min, ip_box_max - centroid)
 
+            ur_depth = np.concatenate([centroid, dimension], axis=0)
+
+            anno_infos.index.append(rb_idx)
+            anno_infos.classes.append(instance_id)
+            anno_infos.name.append(NYU40.index_to_label(instance_id))
+            anno_infos.location.append(centroid)
+            anno_infos.dimensions.append(dimension)
+            anno_infos.gt_boxes_upright_depth.append(ur_depth)
+            anno_infos.unaligned_location.append(centroid)
+            anno_infos.unaligned_dimensions.append(dimension)
+            anno_infos.unaligned_gt_boxes_upright_depth.append(ur_depth)
+
             rb_idx += 1
+        anno_infos.gt_num = rb_idx
+        anno_infos.axis_align_matrix = np.eye(4, dtype=np.float64)
+        return anno_infos.dump()
 
     def _mp_format_dataset(self, rooms_list: List[str], proc_unit: ProcessUnit,\
         start_index=0, worker_id=0):
@@ -281,6 +299,8 @@ class Structured3DDataGen(DatasetBase):
         os.makedirs(semantics_folder, exist_ok=True)
         instance_folder = self.envs.get_env_path(proc_unit.out_paths[2])
         os.makedirs(instance_folder, exist_ok=True)
+        annotation_folder = self.envs.get_env_path(proc_unit.out_paths[3])
+        os.makedirs(annotation_folder, exist_ok=True)
 
         for _, room_path in enumerate(rooms_list):
             scene_id, _, room_id = room_path.split('/')
@@ -288,13 +308,15 @@ class Structured3DDataGen(DatasetBase):
             points_path = os.path.join(points_folder, dump_name)
             semantics_path = os.path.join(semantics_folder, dump_name)
             instance_path = os.path.join(instance_folder, dump_name)
+            annotation_path = os.path.join(annotation_folder, dump_name)
             if np.all([os.path.exists(_path) for _path in \
                 [points_path, semantics_path, instance_path]]):
                 continue
 
             # Step 1: Read images and make point clouds
             a_points, a_colors, a_labels = self._view2points(zip_reader, room_path)
-            v_points, v_colors, v_labels = self._points2voxel((a_points, a_colors, a_labels), 0.01)
+            v_points, v_colors, v_labels = self._points2voxel((a_points, a_colors, \
+                a_labels), 0.01)
             if v_points is None:
                 continue
             np.concatenate([v_points.astype(np.float32), v_colors.astype(np.float32)],\
@@ -302,7 +324,10 @@ class Structured3DDataGen(DatasetBase):
             v_labels.astype(np.int64).tofile(semantics_path)
 
             # Step 2: Read bounding box information
-            self._read_instance_infos(zip_reader, room_path, v_points, v_labels)
+            anno_infos = self._read_instance_infos(zip_reader, room_path, \
+                v_points, v_labels)
+            with open(annotation_path, 'wb') as a_fp:
+                pickle.dump(anno_infos, a_fp)
 
     def format_dataset(self, proc_unit: ProcessUnit):
         attrs = proc_unit.attrs

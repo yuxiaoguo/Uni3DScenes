@@ -9,7 +9,7 @@ import numpy as np
 
 from graphics_utils import g_cfg, g_io
 
-from utils import palette
+from utils.labels.nyu_40 import NYU40
 from utils.config import ProcessUnit, EnvsConfig
 from .base import FuncBase
 
@@ -66,8 +66,7 @@ class PLY3DVisualization(FuncBase):
         file_path = os.path.join(out_folder, f'{sample_alias}_{self.proc_unit.name}.ply')
         pos_xyz = data[0][..., :3]
         if len(data) == 2:
-            color_palette = getattr(palette, f'{self.attrs.color_scheme}_color_palette')()
-            color = np.asarray(color_palette)[data[1]]
+            color = np.asarray(NYU40.color_scheme())[data[1]]
         else:
             color = data[0][..., 3:]
         g_io.PlyIO().add_vertices(pos_xyz, color).dump(file_path)
