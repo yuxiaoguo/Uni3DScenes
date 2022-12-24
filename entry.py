@@ -5,12 +5,11 @@
 # pylint: disable=unused-import
 from typing import Dict
 
-import yaml
-
 from utils.config import EntryConfig, EnvsConfig, StreamingTasks
 from datasets.base_dataset import DatasetBase
 from datasets.structured3d import Structured3DDataGen
 from training.point_cloud import PointCloudDownStreaming
+from training.mmdet3d_tasks import MMDet3DDownStreaming
 from data_processing import SampleWiseProcessing
 
 

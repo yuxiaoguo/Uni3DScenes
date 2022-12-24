@@ -240,8 +240,11 @@ class Structured3DDataGen(DatasetBase):
     def _read_instance_infos(zip_reader: g_io.GroupZipIO, room_path: str, \
         points: np.ndarray, labels: np.ndarray, min_pts=50) -> Dict:
         scene_id, _, _  = room_path.split('/')
-        anno_file, = [_f for _f in zip_reader.namelist() if \
-            _f.find(f'{scene_id}/{__class__.ANNO_FILE}') != -1]
+        try:
+            anno_file, = [_f for _f in zip_reader.namelist() if \
+                _f.find(f'{scene_id}/{__class__.ANNO_FILE}') != -1]
+        except ValueError:
+            return None
         boxes_info: List[Dict] = json.loads(zip_reader.read(anno_file))
 
         anno_infos = Annotations()
@@ -272,7 +275,7 @@ class Structured3DDataGen(DatasetBase):
             ip_box_max = np.max(instance_points, axis=0)
             dimension = np.maximum(centroid - ip_box_min, ip_box_max - centroid)
 
-            ur_depth = np.concatenate([centroid, dimension], axis=0)
+            ur_depth = np.concatenate([centroid, dimension * 2], axis=0)
 
             anno_infos.index.append(rb_idx)
             anno_infos.classes.append(instance_id)
@@ -311,7 +314,7 @@ class Structured3DDataGen(DatasetBase):
             instance_path = os.path.join(instance_folder, dump_name)
             annotation_path = os.path.join(annotation_folder, dump_name)
             if np.all([os.path.exists(_path) for _path in \
-                [points_path, semantics_path, instance_path]]):
+                [points_path, semantics_path, annotation_path]]):
                 continue
 
             # Step 1: Read images and make point clouds
@@ -319,14 +322,18 @@ class Structured3DDataGen(DatasetBase):
             v_points, v_colors, v_labels = self._points2voxel((a_points, a_colors, \
                 a_labels), 0.01)
             if v_points is None:
+                print(f'Ignore {room_path} with invalid points')
                 continue
-            np.concatenate([v_points.astype(np.float32), v_colors.astype(np.float32)],\
-                 axis=-1).tofile(points_path)
-            v_labels.astype(np.int64).tofile(semantics_path)
-
             # Step 2: Read bounding box information
             anno_infos = self._read_instance_infos(zip_reader, room_path, \
                 v_points, v_labels)
+            if anno_infos is None:
+                print(f'Ignore {room_path} with invalid annotations')
+                continue
+
+            np.concatenate([v_points.astype(np.float32), v_colors.astype(np.float32)],\
+                 axis=-1).tofile(points_path)
+            v_labels.astype(np.int64).tofile(semantics_path)
             with open(annotation_path, 'wb') as a_fp:
                 pickle.dump(anno_infos, a_fp)
 

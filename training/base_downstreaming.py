@@ -14,5 +14,11 @@ class DownStreamingBase(EntryBase):
     @abstractmethod
     def segmentation(self, proc_unit: ProcessUnit):
         """
-        Construct 3D point cloud from views
+        Construct segmentation task datasets
+        """
+
+    @abstractmethod
+    def detection(self, proc_unit: ProcessUnit):
+        """
+        Construct detection task datasets
         """
