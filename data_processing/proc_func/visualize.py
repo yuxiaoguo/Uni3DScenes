@@ -68,6 +68,6 @@ class PLY3DVisualization(FuncBase):
         if len(data) == 2:
             color = np.asarray(NYU40.color_scheme())[data[1]]
         else:
-            color = data[0][..., 3:]
+            color = ((data[0][..., 6:9] + 1) * 127.5).astype(np.uint8)
         g_io.PlyIO().add_vertices(pos_xyz, color).dump(file_path)
         shared_vars.setdefault(self.proc_unit.name, list())

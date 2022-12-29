@@ -32,23 +32,23 @@ streaming_lines:
       attrs: {room_types: [all]}
       in_paths: [raw_data_dir]
       out_paths: [point_cloud_dir, semantic_dir, instance_dir, anno_dir]
-# -
-#   assemble_class: 'SampleWiseProcessing'
-#   process_pipelines:
-#     -
-#       assemble_function: PLY3DVisualization
-#       name: 3d_rgb
-#       attrs: {w_boxes: 1, color_scheme: nyu40}
-#       stride: 50
-#       in_paths: [point_cloud_dir]
-#       out_paths: [3d_vis_dir]
-#     -
-#       assemble_function: PLY3DVisualization
-#       name: 3d_label
-#       attrs: {w_labels: 1, color_scheme: nyu40}
-#       stride: 50
-#       in_paths: [point_cloud_dir, semantic_dir]
-#       out_paths: [3d_vis_dir]
+-
+  assemble_class: 'SampleWiseProcessing'
+  process_pipelines:
+    -
+      assemble_function: PLY3DVisualization
+      name: 3d_rgb
+      attrs: {w_boxes: 1, color_scheme: nyu40}
+      stride: 50
+      in_paths: [point_cloud_dir]
+      out_paths: [3d_vis_dir]
+    -
+      assemble_function: PLY3DVisualization
+      name: 3d_label
+      attrs: {w_labels: 1, color_scheme: nyu40}
+      stride: 50
+      in_paths: [point_cloud_dir, semantic_dir]
+      out_paths: [3d_vis_dir]
 -
   assemble_class: 'MMDet3DDownStreaming'
   process_pipelines:

@@ -140,11 +140,11 @@ class Structured3DDataGen(DatasetBase):
         cam_focal = img_size / 2 / np.tan(cam_hf)
         cam_fov_d = S3DUtilize.get_fov_normal(img_size, cam_focal).astype(np.float32)
         v_points = S3DUtilize.cast_perspective_to_local_coord(depth_img, cam_fov_d)
-        v_normal = g_math.normal_from_cross_product(v_points)
+        vi_normals = g_math.normal_from_cross_product(v_points)
 
         # Filtering invalid points
         view_dist = np.maximum(np.linalg.norm(v_points, axis=-1, keepdims=True), float(10e-5))
-        cosine_dist = np.sum((v_points * v_normal / view_dist), axis=-1, keepdims=True)
+        cosine_dist = np.sum((v_points * vi_normals / view_dist), axis=-1, keepdims=True)
         cosine_dist = np.abs(cosine_dist)
         point_valid = cosine_dist > cos_thrsh
         depth_valid = depth_img < 65535
@@ -152,11 +152,14 @@ class Structured3DDataGen(DatasetBase):
         all_valid = (point_valid & depth_valid & smnt_valid)[..., 0]
 
         v_points = np.matmul(v_points / 1000, cam_r.T) + cam_t
+        v_normal = g_math.normal_from_cross_product(v_points)
 
-        return v_points[all_valid], color_img[all_valid], smnt_img[all_valid]
+        return v_points[all_valid], color_img[all_valid], v_normal[all_valid], \
+            smnt_img[all_valid]
 
     @staticmethod
-    def view2points_pano(cam_paras: List[np.ndarray], attr_images: List[np.ndarray]):
+    def view2points_pano(cam_paras: List[np.ndarray], attr_images: List[np.ndarray],
+        cos_thrsh=0.15):
         """
         View to 3D points casting of a single panoramic image
 
@@ -178,18 +181,25 @@ class Structured3DDataGen(DatasetBase):
         point_x = depth_img * p_a_cos * p_b_cos
         point_y = depth_img * p_b_sin
         point_z = depth_img * p_a_sin * p_b_cos
-        points = np.concatenate([point_x, point_y, point_z], axis=-1)
-        points = points / 1000 + cam_t
+        points = np.concatenate([point_x, point_y, point_z], axis=-1) / 1000
+        vi_normals = g_math.normal_from_cross_product(points)
 
         # Filtering invalid points
-        all_valid = np.logical_and(depth_img < 65535, smnt_img > 0)[..., 0]
+        view_dist = np.maximum(np.linalg.norm(points, axis=-1, keepdims=True), float(10e-5))
+        cosine_dist = np.sum((points * vi_normals / view_dist), axis=-1, keepdims=True)
+        cosine_dist = np.abs(cosine_dist)
+        point_valid = cosine_dist > cos_thrsh
+        all_valid = (point_valid & (depth_img < 65535) & (smnt_img > 0))[..., 0]
 
-        return points[all_valid], color_img[all_valid], smnt_img[all_valid]
+        points = points + cam_t
+
+        return points[all_valid], color_img[all_valid], \
+            vi_normals[all_valid], smnt_img[all_valid]
 
     @staticmethod
     def _points2voxel(attr_points: List[np.ndarray], res=0.005) ->\
-        Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        p_points, p_colors, p_labels = attr_points
+        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        p_points, p_colors, p_labels, p_normals = attr_points
 
         try:
             vd_points = np.floor(p_points / res).astype(np.int64)
@@ -201,21 +211,24 @@ class Structured3DDataGen(DatasetBase):
                 vd_box[np.newaxis, ...], axis=-1)
             _, vd_uni = np.unique(vd_indices, return_index=True)
         except ValueError:
-            return None, None, None
+            return None, None, None, None
 
-        return p_points[vd_uni], p_colors[vd_uni], p_labels[vd_uni]
+        return p_points[vd_uni], p_colors[vd_uni], p_labels[vd_uni], \
+            p_normals[vd_uni]
 
     @staticmethod
     def _view2points(zip_reader: g_io.GroupZipIO, room_path) -> \
-        Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         prsp_root = f'{room_path}{__class__.PERSPECTIVE_PREFIX}'
         cam_paths = [_c for _c in zip_reader.namelist() if _c.find(prsp_root) != -1 and \
             _c.find(__class__.PRSP_CAM_FILE) != -1]
         all_infos = list()
         for cam_path in cam_paths:
-            cam_paras, attr_images = __class__.read_camera_and_image(zip_reader, cam_path, 15, None)
-            r_points, r_colors, r_labels = __class__.view2points_prsp(cam_paras, attr_images)
-            all_infos.append((r_points, r_colors, r_labels))
+            cam_paras, attr_images = __class__.read_camera_and_image(\
+                zip_reader, cam_path, 15, None)
+            r_points, r_colors, r_normal, r_labels = \
+                __class__.view2points_prsp(cam_paras, attr_images)
+            all_infos.append((r_points, r_colors, r_normal, r_labels))
 
         pano_cam_root = f'{room_path}{__class__.PANO_CAM_PREFIX}'
         cam_paths = [_c for _c in zip_reader.namelist() if _c.find(pano_cam_root) != -1 and \
@@ -224,17 +237,20 @@ class Structured3DDataGen(DatasetBase):
             pano_root = cam_path[:cam_path.rfind('/')]
             pano_root = pano_root[:pano_root.rfind('/')]
             pano_root = f'{pano_root}{__class__.PANORAMIC_PREFIX}'
-            cam_paras, attr_images = __class__.read_camera_and_image(zip_reader, cam_path, 15, \
-                pano_root)
-            r_points, r_colors, r_labels = __class__.view2points_pano(cam_paras, attr_images)
-            all_infos.append((r_points, r_colors, r_labels))
+            cam_paras, attr_images = __class__.read_camera_and_image(\
+                zip_reader, cam_path, 15, pano_root)
+            r_points, r_colors, r_normal, r_labels = \
+                __class__.view2points_pano(cam_paras, attr_images)
+            all_infos.append((r_points, r_colors, r_normal, r_labels))
 
         a_points = np.concatenate([_i[0] for _i in all_infos], axis=0)
         a_colors = np.concatenate([_i[1] for _i in all_infos], axis=0)
-        a_labels = np.concatenate([_i[2] for _i in all_infos], axis=0)
+        a_normals = np.concatenate([_i[2] for _i in all_infos], axis=0)
+        a_labels = np.concatenate([_i[3] for _i in all_infos], axis=0)
 
         a_points = a_points[..., [2, 0, 1]]  # Convert Y-top to Z-top
-        return a_points, a_colors, a_labels
+        a_normals = a_normals[..., [2, 0, 1]]
+        return a_points, a_colors, a_labels, a_normals
 
     @staticmethod
     def _read_instance_infos(zip_reader: g_io.GroupZipIO, room_path: str, \
@@ -318,9 +334,10 @@ class Structured3DDataGen(DatasetBase):
                 continue
 
             # Step 1: Read images and make point clouds
-            a_points, a_colors, a_labels = self._view2points(zip_reader, room_path)
-            v_points, v_colors, v_labels = self._points2voxel((a_points, a_colors, \
-                a_labels), 0.01)
+            a_points, a_colors, a_labels, a_normals \
+                = self._view2points(zip_reader, room_path)
+            v_points, v_colors, v_labels, v_normals = self._points2voxel((a_points, a_colors, \
+                a_labels, a_normals), 0.01)
             if v_points is None:
                 print(f'Ignore {room_path} with invalid points')
                 continue
@@ -331,8 +348,8 @@ class Structured3DDataGen(DatasetBase):
                 print(f'Ignore {room_path} with invalid annotations')
                 continue
 
-            np.concatenate([v_points.astype(np.float32), v_colors.astype(np.float32)],\
-                 axis=-1).tofile(points_path)
+            np.concatenate([v_points.astype(np.float32), v_colors.astype(np.float32), \
+                v_normals.astype(np.float32)], axis=-1).tofile(points_path)
             v_labels.astype(np.int64).tofile(semantics_path)
             with open(annotation_path, 'wb') as a_fp:
                 pickle.dump(anno_infos, a_fp)
@@ -343,7 +360,7 @@ class Structured3DDataGen(DatasetBase):
         desc_dir = os.path.join(self.envs.out_data_root, 'desc')
         os.makedirs(desc_dir, exist_ok=True)
         with open(os.path.join(desc_dir, proc_unit.out_paths[0]), 'wb') as b_fp:
-            pickle.dump(np.zeros([0, 6], np.float32), b_fp)
+            pickle.dump(np.zeros([0, 9], np.float32), b_fp)
         with open(os.path.join(desc_dir, proc_unit.out_paths[1]), 'wb') as b_fp:
             pickle.dump(np.zeros([0], np.int64), b_fp)
 
