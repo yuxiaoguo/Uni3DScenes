@@ -22,40 +22,51 @@ envs:
     nearest_neighbor_dist_path: $analysis_dir$/nearest.xlsx
     top_view_dir: $analysis_dir$/top_view
     3d_vis_dir: $analysis_dir$/3d_vis
+    # SparseSwin TrainSets dir
+    train_sets_dir: $out_data_root$/sparse_swin
 
 streaming_lines:
 -
-  assemble_class: 'Structured3DDataGen'
+  assemble_class: 'PointCloudDownStreaming'
   process_pipelines:
     -
-      assemble_function: format_dataset
-      attrs: {room_types: [all]}
-      in_paths: [raw_data_dir]
-      out_paths: [point_cloud_dir, semantic_dir, instance_dir, anno_dir]
--
-  assemble_class: 'SampleWiseProcessing'
-  process_pipelines:
-    -
-      assemble_function: PLY3DVisualization
-      name: 3d_rgb
-      attrs: {w_boxes: 1, color_scheme: nyu40}
-      stride: 50
-      in_paths: [point_cloud_dir]
-      out_paths: [3d_vis_dir]
-    -
-      assemble_function: PLY3DVisualization
-      name: 3d_label
-      attrs: {w_labels: 1, color_scheme: nyu40}
-      stride: 50
+      assemble_function: segmentation
+      attrs: {keys: 'points', 'colors', 'labels'}
       in_paths: [point_cloud_dir, semantic_dir]
-      out_paths: [3d_vis_dir]
--
-  assemble_class: 'MMDet3DDownStreaming'
-  process_pipelines:
-    -
-      assemble_function: detection
-      in_paths: [out_data_root]
-      out_paths: [out_data_root]
+      out_paths: [train_sets_dir]
+# -
+#   assemble_class: 'Structured3DDataGen'
+#   process_pipelines:
+#     -
+#       assemble_function: format_dataset
+#       attrs: {room_types: [all]}
+#       in_paths: [raw_data_dir]
+#       out_paths: [point_cloud_dir, semantic_dir, instance_dir, anno_dir]
+# -
+#   assemble_class: 'MMDet3DDownStreaming'
+#   process_pipelines:
+#     -
+#       assemble_function: detection
+#       in_paths: [out_data_root]
+#       out_paths: [out_data_root]s
+# -
+#   assemble_class: 'SampleWiseProcessing'
+#   process_pipelines:
+#     -
+#       assemble_function: PLY3DVisualization
+#       name: 3d_rgb
+#       attrs: {w_boxes: 1, color_scheme: nyu40}
+#       stride: 50
+#       in_paths: [point_cloud_dir]
+#       out_paths: [3d_vis_dir]
+#     -
+#       assemble_function: PLY3DVisualization
+#       name: 3d_label
+#       attrs: {w_labels: 1, color_scheme: nyu40}
+#       stride: 50
+#       in_paths: [point_cloud_dir, semantic_dir]
+#       out_paths: [3d_vis_dir]
+
 # -
 #   assemble_class: 'PointCloudStatistics'
 #   process_pipelines:
@@ -93,11 +104,3 @@ streaming_lines:
     #   attrs: {resolution: 0.01, key: labels, top_axis: y, color_scheme: nyu40}
     #   in_paths: [point_cloud_dir]
     #   out_paths: [top_view_dir]
-# -
-#   assemble_class: 'PointCloudDownStreaming'
-#   process_pipelines:
-#     -
-#       assemble_function: segmentation
-#       attrs: {keys: 'points', 'colors', 'labels'}
-#       in_paths: [point_cloud_dir]
-#       out_paths: [train_sets_dir]

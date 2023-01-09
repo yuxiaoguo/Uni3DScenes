@@ -3,6 +3,7 @@
 # Licensed under the MIT License.
 """
 import os
+import pickle
 from typing import List
 
 import numpy as np
@@ -21,8 +22,10 @@ class PointCloudDownStreaming(DownStreamingBase):
     def _segmentation_mp(self, samples: List[str], proc_unit: ProcessUnit, split=str, offset=0, \
         worker_id: int = 0):
         del offset, worker_id
-        trainsets_dir = self.envs.get_env_path(proc_unit.out_paths[0])
+        trainsets_dir = os.path.join(self.envs.get_env_path(\
+            proc_unit.out_paths[0]), split)
         point_cloud_dir = self.envs.get_env_path(proc_unit.in_paths[0])
+        seg_label_dir = self.envs.get_env_path(proc_unit.in_paths[1])
         os.makedirs(trainsets_dir, exist_ok=True)
 
         remapper = np.ones(150, dtype=np.int32) * (-100)
@@ -33,11 +36,31 @@ class PointCloudDownStreaming(DownStreamingBase):
         torch_writer = TorchWriter(trainsets_dir)
 
         for sample in samples:
-            sample_meta = np.load(os.path.join(point_cloud_dir, sample))
-            points = sample_meta['points']
-            colors = (sample_meta['colors'].astype(np.float32) / 127.5) - 1
-            labels = remapper[sample_meta['labels']]
-            torch_writer.write_item((points, colors, labels), os.path.splitext(sample)[0])
+            meta_desc_path = os.path.join(self.envs.out_data_root, \
+                'desc', 'point_cloud_dir')
+            with open(meta_desc_path, 'rb') as m_fp:
+                meta_desc: np.ndarray = pickle.load(m_fp)
+            sample_shape = [_d if _d != 0 else -1 for _d in meta_desc.shape]
+
+            pts_path = os.path.join(point_cloud_dir, sample)
+            sample_meta = np.fromfile(pts_path, dtype=meta_desc.dtype)
+            sample_meta = np.reshape(sample_meta, sample_shape)
+            points = sample_meta[..., :3]
+            colors = (sample_meta[..., 3:6].astype(np.float32) / 127.5) - 1
+            normals = (sample_meta[..., 6:9].astype(np.float32))
+            feats = np.concatenate([colors, normals], axis=-1)
+
+            meta_desc_path = os.path.join(self.envs.out_data_root, \
+                'desc', 'semantic_dir')
+            with open(meta_desc_path, 'rb') as m_fp:
+                meta_desc: np.ndarray = pickle.load(m_fp)
+
+            sample_shape = [_d if _d != 0 else -1 for _d in meta_desc.shape]
+            seg_path = os.path.join(seg_label_dir, sample)
+            sample_meta = np.fromfile(seg_path, dtype=meta_desc.dtype)
+            sample_meta = np.reshape(sample_meta, sample_shape)
+            labels = remapper[sample_meta]
+            torch_writer.write_item((points, feats, labels), os.path.splitext(sample)[0])
 
     def _split_samples(self, samples: List[str]):
         train_samples, val_samples, test_samples = list(), list(), list()
@@ -48,7 +71,7 @@ class PointCloudDownStreaming(DownStreamingBase):
             elif scene_id < 3250:
                 val_samples.append(sample)
             else:
-                test_samples.append(sample) 
+                test_samples.append(sample)
         return train_samples, val_samples, test_samples
 
     def segmentation(self, proc_unit: ProcessUnit):
