@@ -1,0 +1,13 @@
+pylint
+opencv-python
+numpy
+pandas
+scikit-image
+scikit-learn
+plyfile
+PyYAML
+pillow
+torch
+torchvision
+torchaudio
+openpyxl
