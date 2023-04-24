@@ -15,6 +15,13 @@ from .backend import TorchWriter
 from .base_downstreaming import DownStreamingBase
 
 
+S25_LABEL_SET = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 14, 15,\
+    16, 17, 18, 19, 22, 24, 25, 32, 34, 35, 38, 39, 40]
+
+S28_LABEL_SET = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 15,\
+    16, 17, 18, 19, 22, 24, 25, 32, 33, 34, 35, 36, 38, 39, 40]
+
+
 class PointCloudDownStreaming(DownStreamingBase):
     """
     To deal with point cloud down-streaming task
@@ -29,8 +36,7 @@ class PointCloudDownStreaming(DownStreamingBase):
         os.makedirs(trainsets_dir, exist_ok=True)
 
         remapper = np.ones(150, dtype=np.int32) * (-100)
-        for i_id, s_id in enumerate([1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 14, 15,\
-            16, 17, 18, 19, 22, 24, 25, 32, 34, 35, 38, 39, 40]):
+        for i_id, s_id in enumerate(S25_LABEL_SET):
             remapper[s_id] = i_id
 
         torch_writer = TorchWriter(trainsets_dir)

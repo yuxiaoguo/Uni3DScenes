@@ -29,7 +29,7 @@ def split_dataset_with_ratio(src_folder: str, dst_folder:str, num_pieces: int, k
         samples = sorted(os.listdir(src_phase_path))
         random.shuffle(samples)
         for p_idx in range(num_pieces):
-            if p_idx > kept_pieces:
+            if p_idx >= kept_pieces:
                 continue
             dst_phase_path = os.path.join(f'{dst_folder}_p{num_pieces}s{p_idx}', phase)
             os.makedirs(dst_phase_path, exist_ok=True)
