@@ -7,6 +7,8 @@ Uni3DScenes maintains a uniform and simplified data processing framework to deal
 git clone https://github.com/yuxiaoguo/Uni3DScenes
 cd Uni3DScenes
 git submodule update --init --recursive
+conda create --name uni3drc python=3.8
+conda activate uni3drc  # or `source activate uni3drc` in Linux
 pip install -r requirements.txt
 ```
 
